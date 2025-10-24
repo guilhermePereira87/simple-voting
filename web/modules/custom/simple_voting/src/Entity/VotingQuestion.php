@@ -2,6 +2,15 @@
 
 namespace Drupal\simple_voting\Entity;
 
+use Drupal\Core\Entity\ContentEntityBase;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Entity\EntityOwnerInterface;
+use Drupal\Core\Entity\EntityChangedInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\Access\AccessResult;
+use Drupal\simple_voting\Access\VotingQuestionAccessControlHandler;
+
 /**
  * Defines the VotingQuestion entity.
  *
