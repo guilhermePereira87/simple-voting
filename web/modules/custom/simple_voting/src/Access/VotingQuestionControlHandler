@@ -1,0 +1,49 @@
+<?php
+
+namespace Drupal\simple_voting\Access;
+
+use Drupal\Core\Entity\EntityAccessControlHandler;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Access\AccessResult;
+
+class VotingQuestionControlHandler extends EntityAccessControlHandler {
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function checkAccess(EntityInterface $entity, $operation, AccountInterface $account) {
+
+    //Admin have full access for question editing.
+    if ($account->hasPermission('administer voting questions')) {
+      return AccessResult::allowed();
+    }
+
+    switch($operation) {
+      case 'view':
+        //Can be visualized if active.
+        if ($entity->isPublished()) {
+          return AccessResult::allowed();
+        }
+        return AccessResult::forbidden();
+
+      case 'delete':
+        // Only the question owner can edit/delete it.
+        if ($entity->getOwnerId() === $account->id()) {
+          return AccessResult::allowed();
+        }
+        return AccessResult::forbidden();
+
+      case 'default':
+        return AccessResult::neutral();
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function checkCreateAccess(AccountInterface $account, array $context, $entity_bundle = NULL) {
+    //Users with permission create new questions.
+    return AccessResult::allowedIfHasPermission($account, 'create voting questions');
+  }
+}
