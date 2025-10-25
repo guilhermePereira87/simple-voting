@@ -46,4 +46,5 @@ class VotingQuestionControlHandler extends EntityAccessControlHandler {
     //Users with permission create new questions.
     return AccessResult::allowedIfHasPermission($account, 'create voting questions');
   }
+
 }
