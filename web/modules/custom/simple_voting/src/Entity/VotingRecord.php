@@ -30,6 +30,12 @@ use Drupal\Core\StringTranslation;
  *        "edit" = "Drupal\Core\Entity\ContentEntityForm",
  *        "delete" = "Drupal\Core\Entity\ContentEntityDeleteForm"
  *       }
+ *    },
+ *    constraints = {
+ *      "UniqueField = {
+ *        "fields" = {"question_id", "uid"},
+ *        "message" = @Translation("Each user can only vote once per question.")
+ *      }
  *    }
  * )
  */
