@@ -48,29 +48,29 @@ class VotingQuestion extends ContentEntityBase implements EntityOwnerInterface, 
 
     // Administrative label.
     $fields['label'] = baseFieldDefinitions::create('string')
-      ->setLabel($this->t('Label'))
+      ->setLabel(static::t('Label'))
       ->setRequired(FALSE)
       ->setSettings(['max_length' => 255]);
 
     //Body of the question.
     $fields['question_text'] = baseFieldDefinitions::create('text_long')
-      ->setLabel($this->t('Question Text'))
+      ->setLabel(static::t('Question Text'))
       ->setRequired(TRUE);
 
     // Show results.
     $fields['show_results'] = baseFieldDefinitions::create('boolean')
-      ->setLabel($this->t('Show Results'))
+      ->setLabel(static::t('Show Results'))
       ->setDefaultValue(TRUE);
 
     // Question owner.
-      $fields['uid'] = baseFieldDefinitions::create('entity_reference')
-        ->setLabel($this->t('Author'))
-        ->setSetting('target_type', 'user')
-        ->setDefaultValueCallback([self::class, 'defaultUserId']);
+    $fields['uid'] = baseFieldDefinitions::create('entity_reference')
+      ->setLabel(static::t('Author'))
+      ->setSetting('target_type', 'user')
+      ->setDefaultValueCallback([self::class, 'defaultUserId']);
 
     //Last updated.
-      $fields['changed'] = baseFieldDefinitions::create('changed')
-        ->setLavbel($this->t('Last Update'));
+    $fields['changed'] = baseFieldDefinitions::create('changed')
+      ->setLabel(static::t('Last Update'));
 
     return $fields;
   }
@@ -82,4 +82,5 @@ class VotingQuestion extends ContentEntityBase implements EntityOwnerInterface, 
     $currentUser = \Drupal::currentUser();
     return [$currentUser->id()];
   }
+
 }
