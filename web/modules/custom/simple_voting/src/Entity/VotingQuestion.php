@@ -9,8 +9,12 @@ use Drupal\Core\Entity\EntityPublishedTrait;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\simple_voting\Access\VotingQuestionAccessControlHandler;
 use Drupal\simple_voting\Traits\EntityChangedTrait;
+use Drupal\simple_voting\Traits\EntityOwnerTrait;
+use Drupal\user\EntityOwnerInterface as UserEntityOwnerInterface;
+use Drupal\user\UserInterface;
 
 /**
  * Defines the VotingQuestion entity.
@@ -38,10 +42,10 @@ use Drupal\simple_voting\Traits\EntityChangedTrait;
  * )
  */
 
-class VotingQuestion extends ContentEntityBase implements EntityOwnerInterface, EntityChangedInterface {
-  use StringTranslationTrait;
+class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterface, EntityChangedInterface {
   use EntityPublishedTrait;
   use EntityChangedTrait;
+  use EntityOwnerTrait;
 
   /**
    * {@inheritdoc}
@@ -52,33 +56,33 @@ class VotingQuestion extends ContentEntityBase implements EntityOwnerInterface, 
 
     // Administrative label.
     $fields['title'] = BaseFieldDefinition::create('string')
-      ->setLabel(static::t('Title'))
+      ->setLabel(new TranslatableMarkup('Title'))
       ->setRequired(FALSE)
       ->setSettings(['max_length' => 255])
-      ->setDescription(static::t('Optional title for the question.'));
+      ->setDescription(new TranslatableMarkup('Optional title for the question.'));
 
     //Body of the question.
     $fields['question_text'] = BaseFieldDefinition::create('text_long')
-      ->setLabel(static::t('Question Text'))
+      ->setLabel(new TranslatableMarkup('Question Text'))
       ->setRequired(TRUE)
-      ->setDescription(static::t('Descriptor of the question.'));
+      ->setDescription(new TranslatableMarkup('Descriptor of the question.'));
 
     // Show results.
     $fields['show_results'] = BaseFieldDefinition::create('boolean')
-      ->setLabel(static::t('Show Results'))
+      ->setLabel(new TranslatableMarkup('Show Results'))
       ->setDefaultValue(TRUE)
-      ->setDescription(static::t('Determines if the result of the pool will be displayed after vote.'));
+      ->setDescription(new TranslatableMarkup('Determines if the result of the pool will be displayed after vote.'));
 
     // Question owner.
     $fields['uid'] = BaseFieldDefinition::create('entity_reference')
-      ->setLabel(static::t('Author'))
+      ->setLabel(new TranslatableMarkup('Author'))
       ->setSetting('target_type', 'user')
       ->setDefaultValueCallback([self::class, 'defaultUserId'])
-      ->setDescription(static::t('The owner of the question.'));
+      ->setDescription(new TranslatableMarkup('The owner of the question.'));
 
     //Last updated.
     $fields['changed'] = BaseFieldDefinition::create('changed')
-      ->setLabel(static::t('Last Update'));
+      ->setLabel(new TranslatableMarkup('Last Update'));
 
     return $fields;
   }

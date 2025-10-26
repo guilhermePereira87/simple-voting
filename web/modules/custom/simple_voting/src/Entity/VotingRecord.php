@@ -8,7 +8,10 @@ use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Entity\EntityOwnerInterface;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\simple_voting\Traits\EntityChangedTrait;
+use Drupal\simple_voting\Traits\EntityOwnerTrait;
+use Drupal\user\EntityOwnerInterface as UserEntityOwnerInterface;
 
 /**
  * Defines the VotingRecord entity.
@@ -41,9 +44,10 @@ use Drupal\simple_voting\Traits\EntityChangedTrait;
  * )
  */
 
- final class VotingRecord extends ContentEntityBase implements EntityOwnerInterface, EntityChangedInterface {
+ final class VotingRecord extends ContentEntityBase implements UserEntityOwnerInterface, EntityChangedInterface {
    use StringTranslationTrait;
    use EntityChangedTrait;
+   use EntityOwnerTrait;
 
    /**
    * {@inheritdoc}
@@ -53,27 +57,27 @@ use Drupal\simple_voting\Traits\EntityChangedTrait;
 
     // Voted question reference.
     $fields['question_id'] = BaseFieldDefinition::create('entity_reference')
-      ->setLabel(t('Voting Question'))
+      ->setLabel(new TranslatableMarkup('Voting Question'))
       ->setSetting('target_type', 'voting_question')
       ->setRequired(TRUE)
-      ->setDescription(t('Reference to the question this vote belongs to.'));
+      ->setDescription(new TranslatableMarkup('Reference to the question this vote belongs to.'));
 
     // Reference to the selected option.
     $fields['option_id'] = BaseFieldDefinition::create('entity_reference')
-      ->setLabel(t('Selected Option'))
+      ->setLabel(new TranslatableMarkup('Selected Option'))
       ->setSetting('target_type', 'voting_option')
       ->setRequired(TRUE)
-      ->setDescription(t('Reference to the selected option.'));
+      ->setDescription(new TranslatableMarkup('Reference to the selected option.'));
 
     // Reference to the voter.
     $fields['uid'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(static::t('Voter'))
       ->setSetting('target_type', 'user')
-      ->setDescription(t('The user who voted.'));
+      ->setDescription(new TranslatableMarkup('The user who voted.'));
 
     //Last updated.
     $fields['changed'] = BaseFieldDefinition::create('changed')
-      ->setLabel(t('Last Update'));
+      ->setLabel(new TranslatableMarkup('Last Update'));
 
     return $fields;
   }
