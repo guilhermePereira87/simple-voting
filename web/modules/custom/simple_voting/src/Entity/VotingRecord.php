@@ -71,7 +71,7 @@ use Drupal\user\EntityOwnerInterface as UserEntityOwnerInterface;
 
     // Reference to the voter.
     $fields['uid'] = BaseFieldDefinition::create('entity_reference')
-      ->setLabel(static::t('Voter'))
+      ->setLabel(new TranslatableMarkup('Voter'))
       ->setSetting('target_type', 'user')
       ->setDescription(new TranslatableMarkup('The user who voted.'));
 
