@@ -37,7 +37,6 @@ use Drupal\simple_voting\Traits\EntityChangedTrait;
  * )
  */
 final class VotingOption extends ContentEntityBase implements EntityChangedInterface {
-  use StringTranslationTrait;
   use EntityChangedTrait;
 
   /**
@@ -48,33 +47,33 @@ final class VotingOption extends ContentEntityBase implements EntityChangedInter
 
     // Short label.
     $fields['title'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Title'))
+      ->setLabel(new TranslatableMarkup('Title'))
       ->setRequired(TRUE)
       ->setSettings(['max_length' => 255])
-      ->setDescription(t('The short label for this voting option.'));
+      ->setDescription(new TranslatableMarkup('The short label for this voting option.'));
 
     // Optional description text for the option.
     $fields['text'] = BaseFieldDefinition::create('text_long')
-      ->setLabel(t('Option Text'))
+      ->setLabel(new TranslatableMarkup('Option Text'))
       ->setRequired(FALSE)
-      ->setDescription(t('A detailed description of the option.'));
+      ->setDescription(new TranslatableMarkup('A detailed description of the option.'));
     
     // Optional image
     $fields['image'] = BaseFieldDefinition::create('image')
-      ->setLabel(t('Option Image'))
+      ->setLabel(new TranslatableMarkup('Option Image'))
       ->setRequired(FALSE)
-      ->setDescription(t('An optional image associated with this option.'));
+      ->setDescription(new TranslatableMarkup('An optional image associated with this option.'));
 
     // Reference to the parent VotingQuestion entity.
     $fields['question_id'] = BaseFieldDefinition::create('entity_reference')
-      ->setLabel(t('Voting Question'))
+      ->setLabel(new TranslatableMarkup('Voting Question'))
       ->setSetting('target_type', 'voting_question')
       ->setRequired(TRUE)
-      ->setDescription(t('The parent question this option belongs to.'));
+      ->setDescription(new TranslatableMarkup('The parent question this option belongs to.'));
 
     // Timestamp of the last update.
     $fields['changed'] = BaseFieldDefinition::create('changed')
-      ->setLabel(t('Last Update'));
+      ->setLabel(new TranslatableMarkup('Last Update'));
 
     return $fields;
   }
