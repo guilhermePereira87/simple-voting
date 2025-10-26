@@ -1,0 +1,8 @@
+administer voting questions:
+  title: 'Administer voting questions'
+  description: 'Allows users to edit, delete, and view all voting questions, regardless of status.'
+  restrict: true
+
+create voting questions:
+  title: 'Create voting questions'
+  description: 'Allows users to create new voting questions.'
