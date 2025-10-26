@@ -31,7 +31,7 @@ use Drupal\simple_voting\Traits\EntityChangedTrait;
  *       "default" = "Drupal\Core\Entity\ContentEntityForm",
  *       "add" = "Drupal\Core\Entity\ContentEntityForm",
  *       "edit" = "Drupal\Core\Entity\ContentEntityForm",
- *       "delete" = "Drupal\Core\Entity\ContentEntityForm"
+ *       "delete" = "Drupal\Core\Entity\ContentEntityDeleteForm"
  *       }
  *   }
  * )

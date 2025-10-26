@@ -48,7 +48,7 @@ class VotingQuestion extends ContentEntityBase implements EntityOwnerInterface, 
    */
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type): array {
     $fields = parent::baseFieldDefinitions($entity_type);
-    $fields =+ static::publishedBaseFieldDefinitions($entity_type);
+    $fields += static::publishedBaseFieldDefinitions($entity_type);
 
     // Administrative label.
     $fields['title'] = BaseFieldDefinition::create('string')

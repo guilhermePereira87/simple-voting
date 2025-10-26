@@ -24,7 +24,7 @@ use Drupal\simple_voting\Traits\EntityChangedTrait;
  *   },
  *   handlers = {
  *      "access" = "Drupal\Core\Entity\EntityAccessControlHandler",
- *      "list_biulder" = "Drupal\Core\Entity\EntityListBuilder",
+ *      "list_builder" = "Drupal\Core\Entity\EntityListBuilder",
  *      "form" = {
  *        "default" = "Drupal\Core\Entity\ContentEntityForm",
  *        "add" = "Drupal\Core\Entity\ContentEntityForm",
