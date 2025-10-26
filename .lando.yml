@@ -7,3 +7,31 @@ config:
   composer_version: 2-latest
   drush: ^13
   webroot: web
+
+events:
+  post-start:
+    - appserver: |
+        # Se já existir composer global, ok
+        if command -v composer >/dev/null 2>&1; then
+          echo "Composer global já presente: $(composer --version)"
+          exit 0
+        fi
+
+        # Se já existir composer no /app, ok
+        if [ -x /app/composer ]; then
+          echo "Composer já instalado em /app: $(php /app/composer --version)"
+          exit 0
+        fi
+
+        # Instala Composer em /app (diretório do projeto) — não precisa de sudo
+        echo "Instalando Composer em /app/composer..."
+        curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+        php /tmp/composer-setup.php --install-dir=/app --filename=composer
+        chmod +x /app/composer || true
+        rm -f /tmp/composer-setup.php || true
+        php /app/composer --version || echo "Erro ao verificar composer"
+
+tooling:
+  composer:
+    service: appserver
+    cmd: php /app/composer

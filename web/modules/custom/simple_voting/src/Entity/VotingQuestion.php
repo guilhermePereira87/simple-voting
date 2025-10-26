@@ -5,6 +5,7 @@ namespace Drupal\simple_voting\Entity;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\Entity\EntityOwnerInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityPublishedTrait;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
@@ -28,6 +29,7 @@ use Drupal\user\UserInterface;
  *     "uuid" = "uuid",
  *     "label" = "title",
  *     "owner" = "uid",
+ *     "published" = "status",
  *   },
  *   handlers = {
  *     "access" = "Drupal\simple_voting\Access\VotingQuestionAccessControlHandler",
@@ -42,7 +44,7 @@ use Drupal\user\UserInterface;
  * )
  */
 
-class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterface, EntityChangedInterface {
+class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterface, EntityChangedInterface, EntityPublishedInterface {
   use EntityPublishedTrait;
   use EntityChangedTrait;
   use EntityOwnerTrait;
@@ -77,7 +79,7 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
     $fields['uid'] = BaseFieldDefinition::create('entity_reference')
       ->setLabel(new TranslatableMarkup('Author'))
       ->setSetting('target_type', 'user')
-      ->setDefaultValueCallback([self::class, 'defaultUserId'])
+      ->setDefaultValueCallback(self::class . '::defaultUserId')
       ->setDescription(new TranslatableMarkup('The owner of the question.'));
 
     //Last updated.
