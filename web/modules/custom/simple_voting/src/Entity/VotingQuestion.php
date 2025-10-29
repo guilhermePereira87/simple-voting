@@ -8,6 +8,7 @@ use Drupal\Core\Entity\EntityOwnerInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityPublishedTrait;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -23,23 +24,42 @@ use Drupal\user\UserInterface;
  * @ContentEntityType(
  *   id = "voting_question",
  *   label = @Translation("Voting Question"),
+ *   handlers = {
+ *     "access" = "Drupal\simple_voting\Access\VotingQuestionAccessControlHandler",
+ *     "storage" = "Drupal\Core\Entity\Sql\SqlContentEntityStorage",
+ *     "translation" = "Drupal\content_translation\ContentTranslationHandler",
+ *     "list_builder" = "Drupal\simple_voting\ListBuilder\VotingQuestionListBuilder",
+ *     "view_builder" = "Drupal\\simple_voting\\Entity\\VotingQuestionViewBuilder",
+ *     "views_data" = "Drupal\views\EntityViewsData",
+ *     "form" = {
+ *       "default" = "Drupal\Core\Entity\ContentEntityForm",
+ *       "add" = "Drupal\simple_voting\Form\VotingQuestionAddForm",
+ *       "edit" = "Drupal\simple_voting\Form\VotingQuestionEditForm",
+ *       "delete" = "Drupal\Core\Entity\ContentEntityDeleteForm",
+ *     },
+ *     "route_provider" = {
+ *       "html" = "Drupal\Core\Entity\Routing\DefaultHtmlRouteProvider",
+ *     },
+ *   },
+ *   links = {
+ *     "canonical" = "/voting_question/{voting_question}",
+ *     "add-form" = "/voting_question/add",
+ *     "edit-form" = "/voting_question/{voting_question}/edit",
+ *     "delete-form" = "/voting_question/{voting_question}/delete",
+ *     "collection" = "/admin/content/voting_questions"
+ *   },
  *   base_table = "voting_question",
+ *   data_table = "voting_question_field_data",
+ *   admin_permission = "administer voting questions",
+ *   field_ui_base_route = "entity.voting_question.settings",
+ *   translatable = TRUE,
  *   entity_keys = {
  *     "id" = "id",
  *     "uuid" = "uuid",
  *     "label" = "title",
  *     "owner" = "uid",
  *     "published" = "status",
- *   },
- *   handlers = {
- *     "access" = "Drupal\simple_voting\Access\VotingQuestionAccessControlHandler",
- *     "list_builder" = "Drupal\Core\Entity\EntityListBuilder",
- *     "form" = {
- *       "default" = "Drupal\Core\Entity\ContentEntityForm",
- *       "add" = "Drupal\Core\Entity\ContentEntityForm",
- *       "edit" = "Drupal\Core\Entity\ContentEntityForm",
- *       "delete" = "Drupal\Core\Entity\ContentEntityDeleteForm"
- *     }
+ *     "langcode" = "langcode",
  *   }
  * )
  */
@@ -61,19 +81,37 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
       ->setLabel(new TranslatableMarkup('Title'))
       ->setRequired(FALSE)
       ->setSettings(['max_length' => 255])
-      ->setDescription(new TranslatableMarkup('Optional title for the question.'));
+      ->setDescription(new TranslatableMarkup('Optional title for the question.'))
+      ->setDisplayOptions('form', [
+        'type' => 'string_textfield',
+        'weight' => -100,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
 
-    //Body of the question.
+
+    // Body of the question.
     $fields['question_text'] = BaseFieldDefinition::create('text_long')
       ->setLabel(new TranslatableMarkup('Question Text'))
       ->setRequired(TRUE)
-      ->setDescription(new TranslatableMarkup('Descriptor of the question.'));
+      ->setDescription(new TranslatableMarkup('Descriptor of the question.'))
+      ->setDisplayOptions('form', [
+        'type' => 'text_textarea',
+        'weight' => -95,
+      ])
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', TRUE);
 
     // Show results.
     $fields['show_results'] = BaseFieldDefinition::create('boolean')
       ->setLabel(new TranslatableMarkup('Show Results'))
       ->setDefaultValue(TRUE)
-      ->setDescription(new TranslatableMarkup('Determines if the result of the pool will be displayed after vote.'));
+      ->setDescription(new TranslatableMarkup('Determines if the result of the pool will be displayed after vote.'))
+      ->setDisplayOptions('form', [
+        'type' => 'boolean_checkbox',
+        'weight' => 0,
+      ])
+      ->setDisplayConfigurable('form', TRUE);
 
     // Question owner.
     $fields['uid'] = BaseFieldDefinition::create('entity_reference')
@@ -82,11 +120,56 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
       ->setDefaultValueCallback(self::class . '::defaultUserId')
       ->setDescription(new TranslatableMarkup('The owner of the question.'));
 
+    // Choices / options for the question.
+    $fields['choice'] = BaseFieldDefinition::create('entity_reference')
+      ->setLabel(new TranslatableMarkup('Choices'))
+      ->setSetting('target_type', 'voting_option')
+      ->setDescription(new TranslatableMarkup('The options available for this question.'))
+      ->setRequired(TRUE)
+      ->setTranslatable(FALSE)
+      ->setCardinality(BaseFieldDefinition::CARDINALITY_UNLIMITED);
+
     //Last updated.
     $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(new TranslatableMarkup('Last Update'));
 
     return $fields;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function preSave(EntityStorageInterface $storage) {
+    parent::preSave($storage);
+
+    // If referenced option entities were created/changed inline, save them and
+    // ensure the reference stores the target_id.
+    if (!empty($this->choice)) {
+      foreach ($this->choice as $choice_item) {
+        if ($choice_item->entity && $choice_item->entity->isNew()) {
+          $choice_item->entity->save();
+          $choice_item->target_id = $choice_item->entity->id();
+        }
+      }
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function postDelete(EntityStorageInterface $storage, array $entities) {
+    parent::postDelete($storage, $entities);
+
+    // Delete referenced voting options when the question is deleted.
+    $choices = [];
+    foreach ($entities as $entity) {
+      if ($entity->choice) {
+        $choices = array_merge($choices, $entity->choice->referencedEntities());
+      }
+    }
+    if ($choices) {
+      \Drupal::entityTypeManager()->getStorage('voting_option')->delete($choices);
+    }
   }
 
   /**
