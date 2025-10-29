@@ -17,6 +17,18 @@ class VotingQuestionEditForm extends ContentEntityForm {
   public function form(array $form, FormStateInterface $form_state) {
     $form = parent::form($form, $form_state);
 
+    // Published checkbox so editors can toggle publish state while editing.
+    $default_published = 1;
+    if (!empty($this->entity) && $this->entity->hasField('status') && !$this->entity->get('status')->isEmpty()) {
+      $default_published = (bool) $this->entity->get('status')->value;
+    }
+    $form['status'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Published'),
+      '#default_value' => $default_published,
+      '#weight' => -90,
+    ];
+
   /* @var \Drupal\simple_voting\Entity\VotingQuestion $question */
   $question = $this->entity;
     // Load existing options for this question by querying voting_option where
@@ -134,6 +146,10 @@ class VotingQuestionEditForm extends ContentEntityForm {
    * {@inheritdoc}
    */
   public function save(array $form, FormStateInterface $form_state) {
+    // Apply published state from form before saving the entity.
+    $status = $form_state->getValue('status');
+    $this->entity->set('status', (bool) $status);
+
     // Save the question entity first.
     parent::save($form, $form_state);
     $question = $this->entity;

@@ -120,10 +120,6 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
       ->setDefaultValueCallback(self::class . '::defaultUserId')
       ->setDescription(new TranslatableMarkup('The owner of the question.'));
 
-    // Note: options are stored on the child entity `voting_option` via the
-    // `question_id` reference. We do not keep a mirrored `choice` field here to
-    // avoid duplication and consistency issues.
-
     //Last updated.
     $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(new TranslatableMarkup('Last Update'));

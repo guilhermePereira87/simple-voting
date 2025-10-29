@@ -1,0 +1,44 @@
+simple_voting.api.questions:
+  path: '/api/v1/questions'
+  defaults:
+    _controller: '\Drupal\simple_voting\Controller\ApiController::questions'
+    _format: 'json'
+  requirements:
+    _access: 'TRUE'
+  methods: [GET]
+
+simple_voting.api.question_by_id:
+  path: '/api/v1/questions/{id}'
+  defaults:
+    _controller: '\Drupal\simple_voting\Controller\ApiController::getQuestionById'
+    _format: 'json'
+  requirements:
+    _access: 'TRUE'
+  methods: [GET]
+
+simple_voting.api.question_results:
+  path: '/api/v1/questions/{id}/results'
+  defaults:
+    _controller: '\Drupal\simple_voting\Controller\ApiController::getQuestionResults'
+    _format: 'json'
+  requirements:
+    _access: 'TRUE'
+  methods: [GET]
+
+simple_voting.api.vote:
+  path: '/api/v1/vote/{questionId}/{optionId}'
+  defaults:
+    _controller: '\Drupal\simple_voting\Controller\ApiController::vote'
+    _format: 'json'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]
+
+simple_voting.api.login:
+  path: '/api/v1/auth/login'
+  defaults:
+    _controller: '\Drupal\simple_voting\Controller\ApiController::login'
+    _format: 'json'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]
