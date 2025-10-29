@@ -194,6 +194,25 @@ class VoteRecordForm extends FormBase {
     ]);
     $record->save();
 
+    // Mark this question as voted in the current session so API calls from
+    // the same browser/session will be blocked as well.
+    try {
+      $request = \Drupal::request();
+      $session = $request->getSession();
+      if (!$session->isStarted()) {
+        $session->start();
+      }
+      $session_id = $session->getId();
+      $kv = \Drupal::keyValue('simple_voting_session_votes');
+      $voted = $kv->get($session_id, []);
+      $voted[] = (int) $qid;
+      $kv->set($session_id, array_values(array_unique($voted)));
+    }
+    catch (\Exception $e) {
+      // Non-fatal: do not block normal flow if session/keyValue fails.
+      \Drupal::logger('simple_voting')->warning('Could not mark session vote: @msg', ['@msg' => $e->getMessage()]);
+    }
+
     $this->messenger()->addStatus($this->t('Your vote has been recorded.'));
     $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $qid]);
   }

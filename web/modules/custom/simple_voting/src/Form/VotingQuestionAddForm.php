@@ -22,6 +22,18 @@ class VotingQuestionAddForm extends ContentEntityForm {
       return $form;
     }
 
+    // Published checkbox so creators can publish/unpublish at creation time.
+    $default_published = 1;
+    if (!empty($this->entity) && $this->entity->hasField('status') && !$this->entity->get('status')->isEmpty()) {
+      $default_published = (bool) $this->entity->get('status')->value;
+    }
+    $form['status'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Published'),
+      '#default_value' => $default_published,
+      '#weight' => -90,
+    ];
+
     // We manage options directly on the voting_option entity via question_id.
 
     $num = $form_state->get('num_options');
@@ -100,6 +112,13 @@ class VotingQuestionAddForm extends ContentEntityForm {
    * {@inheritdoc}
    */
   public function save(array $form, FormStateInterface $form_state) {
+    // Ensure the published state from the form is applied before the entity
+    // is saved so the initial save includes the desired status.
+    $status = $form_state->getValue('status');
+    // Set the status field value directly. VotingQuestion implements the
+    // published convention, so writing the 'status' base field is sufficient.
+    $this->entity->set('status', (bool) $status);
+
     // Save the question first to ensure it has an ID for option references.
     parent::save($form, $form_state);
     $question = $this->entity;
