@@ -1,0 +1,10 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function simple_voting_install() {
+  \Drupal::configFactory()->getEditable('system.site')
+    ->set('page.front', '/voting-question')
+    ->save();
+}

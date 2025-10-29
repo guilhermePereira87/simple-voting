@@ -16,20 +16,19 @@ class VotingQuestionForm extends ContentEntityForm {
   public function form(array $form, FormStateInterface $form_state) {
     $form = parent::form($form, $form_state);
 
-    // Hide the default entity_reference widget to avoid validation errors
-    // for free-text option titles. We'll manage choices via a textarea.
-    if (isset($form['choice'])) {
-      $form['choice']['#access'] = FALSE;
-    }
-
     $entity = $this->entity;
     $default = '';
-    if (!$entity->isNew() && $entity->choice) {
-      $titles = [];
-      foreach ($entity->choice->referencedEntities() as $opt) {
-        $titles[] = $opt->label();
+    if (!$entity->isNew()) {
+      $storage = \Drupal::entityTypeManager()->getStorage('voting_option');
+  $ids = $storage->getQuery()->condition('question_id', $entity->id())->accessCheck(FALSE)->execute();
+      if (!empty($ids)) {
+        $opts = $storage->loadMultiple($ids);
+        $titles = [];
+        foreach ($opts as $opt) {
+          $titles[] = $opt->label();
+        }
+        $default = implode("\n", $titles);
       }
-      $default = implode("\n", $titles);
     }
 
     $form['choice_textarea'] = [
@@ -77,8 +76,8 @@ class VotingQuestionForm extends ContentEntityForm {
       foreach ($target_ids as $tid) {
         $refs[] = ['target_id' => $tid];
       }
-      $entity->set('choice', $refs);
-      $entity->save();
+  // Options are created with question_id; we do not mirror refs on the
+  // question entity.
     }
 
     // Redirect to canonical after save.

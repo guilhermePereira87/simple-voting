@@ -22,10 +22,7 @@ class VotingQuestionAddForm extends ContentEntityForm {
       return $form;
     }
 
-    // Hide the core 'choice' widget so we can populate it programmatically.
-    if (isset($form['choice'])) {
-      $form['choice']['#access'] = FALSE;
-    }
+    // We manage options directly on the voting_option entity via question_id.
 
     $num = $form_state->get('num_options');
     if ($num === NULL) {
@@ -49,6 +46,13 @@ class VotingQuestionAddForm extends ContentEntityForm {
       $form['options'][$i]['title'] = [
         '#type' => 'textfield',
         '#title' => $this->t('Option title'),
+        '#required' => FALSE,
+      ];
+
+      $form['options'][$i]['description'] = [
+        '#type' => 'textarea',
+        '#title' => $this->t('Option description (optional)'),
+        '#description' => $this->t('A short description for this option.'),
         '#required' => FALSE,
       ];
 
@@ -123,6 +127,12 @@ class VotingQuestionAddForm extends ContentEntityForm {
         'question_id' => $question->id(),
       ];
 
+      // Optional description text.
+      $text = trim($opt['description'] ?? '');
+      if ($text !== '') {
+        $fields['text'] = [['value' => $text]];
+      }
+
       $fid = NULL;
       $file = NULL;
       if (!empty($opt['image']) && is_array($opt['image'])) {
@@ -157,14 +167,8 @@ class VotingQuestionAddForm extends ContentEntityForm {
       $created_ids[] = $option->id();
     }
 
-    if (!empty($created_ids)) {
-      $refs = [];
-      foreach ($created_ids as $id) {
-        $refs[] = ['target_id' => $id];
-      }
-      $question->set('choice', $refs);
-      $question->save();
-    }
+    // Options are already created with 'question_id' set; no mirrored
+    // references are maintained on the question entity.
 
     \Drupal::messenger()->addMessage($this->t('Voting question created with @count options.', ['@count' => count($created_ids)]));
 

@@ -19,26 +19,31 @@ class VotingQuestionEditForm extends ContentEntityForm {
 
   /* @var \Drupal\simple_voting\Entity\VotingQuestion $question */
   $question = $this->entity;
-    // Hide the core choice widget; we'll manage choices here.
-    if (isset($form['choice'])) {
-      $form['choice']['#access'] = FALSE;
-    }
-
-    // Load existing options (referenced entities) if any.
+    // Load existing options for this question by querying voting_option where
+    // question_id == $question->id().
     $existing = [];
-    if (!$question->isNew() && $question->hasField('choice')) {
-      $options = $question->get('choice')->referencedEntities();
-      foreach ($options as $opt) {
-        /* @var \Drupal\simple_voting\Entity\VotingOption $opt */
-        $fid = NULL;
-        if ($opt->hasField('image') && !$opt->get('image')->isEmpty()) {
-          $fid = $opt->get('image')->target_id;
+    if (!$question->isNew()) {
+      $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
+  $ids = $option_storage->getQuery()->condition('question_id', $question->id())->accessCheck(FALSE)->sort('id', 'ASC')->execute();
+      if (!empty($ids)) {
+        $options = $option_storage->loadMultiple($ids);
+        foreach ($options as $opt) {
+          /* @var \Drupal\simple_voting\Entity\VotingOption $opt */
+          $fid = NULL;
+          if ($opt->hasField('image') && !$opt->get('image')->isEmpty()) {
+            $fid = $opt->get('image')->target_id;
+          }
+          $text = '';
+          if ($opt->hasField('text') && !$opt->get('text')->isEmpty()) {
+            $text = $opt->get('text')->value;
+          }
+          $existing[] = [
+            'id' => $opt->id(),
+            'title' => $opt->label(),
+            'image' => $fid ? [$fid] : [],
+            'description' => $text,
+          ];
         }
-        $existing[] = [
-          'id' => $opt->id(),
-          'title' => $opt->label(),
-          'image' => $fid ? [$fid] : [],
-        ];
       }
     }
 
@@ -75,6 +80,13 @@ class VotingQuestionEditForm extends ContentEntityForm {
         '#type' => 'textfield',
         '#title' => $this->t('Option title'),
         '#default_value' => $defaults['title'],
+        '#required' => FALSE,
+      ];
+
+      $form['options'][$i]['description'] = [
+        '#type' => 'textarea',
+        '#title' => $this->t('Option description (optional)'),
+        '#default_value' => $defaults['description'] ?? '',
         '#required' => FALSE,
       ];
 
@@ -168,6 +180,11 @@ class VotingQuestionEditForm extends ContentEntityForm {
 
         // Update title (required at this point).
         $opt->set('title', $title);
+        // Update description if provided.
+        $desc = trim($row['description'] ?? '');
+        if ($opt->hasField('text')) {
+          $opt->set('text', [['value' => $desc]]);
+        }
 
         // Handle image replacement/setting when a new file was uploaded.
         if (!empty($fid)) {
@@ -230,20 +247,19 @@ class VotingQuestionEditForm extends ContentEntityForm {
         if (!empty($file) && $file instanceof File) {
           $file_usage->add($file, 'simple_voting', 'voting_option', $new->id());
         }
+        // Save optional description for newly created option if provided.
+        $desc = trim($row['description'] ?? '');
+        if ($desc !== '') {
+          $new->set('text', [['value' => $desc]]);
+          $new->save();
+        }
         $kept[] = $new->id();
       }
+
     }
 
-    // Ensure the question references only the kept option ids.
-    if (!empty($kept)) {
-      $refs = array_map(function ($id) { return ['target_id' => $id]; }, $kept);
-      $question->set('choice', $refs);
-    }
-    else {
-      // Clear references if none kept.
-      $question->set('choice', []);
-    }
-    $question->save();
+    // We don't maintain a mirrored 'choice' field on the question. Options
+    // have been created/updated/deleted above with the proper 'question_id'.
 
     \Drupal::messenger()->addMessage($this->t('Voting question saved with @count options.', ['@count' => count($kept)]));
     $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $question->id()]);

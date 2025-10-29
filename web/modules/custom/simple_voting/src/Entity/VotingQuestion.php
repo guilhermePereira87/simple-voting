@@ -29,7 +29,7 @@ use Drupal\user\UserInterface;
  *     "storage" = "Drupal\Core\Entity\Sql\SqlContentEntityStorage",
  *     "translation" = "Drupal\content_translation\ContentTranslationHandler",
  *     "list_builder" = "Drupal\simple_voting\ListBuilder\VotingQuestionListBuilder",
- *     "view_builder" = "Drupal\\simple_voting\\Entity\\VotingQuestionViewBuilder",
+ *     "view_builder" = "Drupal\simple_voting\Entity\VotingQuestionViewBuilder",
  *     "views_data" = "Drupal\views\EntityViewsData",
  *     "form" = {
  *       "default" = "Drupal\Core\Entity\ContentEntityForm",
@@ -120,14 +120,9 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
       ->setDefaultValueCallback(self::class . '::defaultUserId')
       ->setDescription(new TranslatableMarkup('The owner of the question.'));
 
-    // Choices / options for the question.
-    $fields['choice'] = BaseFieldDefinition::create('entity_reference')
-      ->setLabel(new TranslatableMarkup('Choices'))
-      ->setSetting('target_type', 'voting_option')
-      ->setDescription(new TranslatableMarkup('The options available for this question.'))
-      ->setRequired(TRUE)
-      ->setTranslatable(FALSE)
-      ->setCardinality(BaseFieldDefinition::CARDINALITY_UNLIMITED);
+    // Note: options are stored on the child entity `voting_option` via the
+    // `question_id` reference. We do not keep a mirrored `choice` field here to
+    // avoid duplication and consistency issues.
 
     //Last updated.
     $fields['changed'] = BaseFieldDefinition::create('changed')
@@ -141,17 +136,6 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
    */
   public function preSave(EntityStorageInterface $storage) {
     parent::preSave($storage);
-
-    // If referenced option entities were created/changed inline, save them and
-    // ensure the reference stores the target_id.
-    if (!empty($this->choice)) {
-      foreach ($this->choice as $choice_item) {
-        if ($choice_item->entity && $choice_item->entity->isNew()) {
-          $choice_item->entity->save();
-          $choice_item->target_id = $choice_item->entity->id();
-        }
-      }
-    }
   }
 
   /**
@@ -160,15 +144,20 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
   public static function postDelete(EntityStorageInterface $storage, array $entities) {
     parent::postDelete($storage, $entities);
 
-    // Delete referenced voting options when the question is deleted.
-    $choices = [];
+    // Delete voting_option entities that reference the deleted question(s).
+    $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
+    $to_delete = [];
     foreach ($entities as $entity) {
-      if ($entity->choice) {
-        $choices = array_merge($choices, $entity->choice->referencedEntities());
+      $ids = $option_storage->getQuery()
+        ->condition('question_id', $entity->id())
+        ->accessCheck(FALSE)
+        ->execute();
+      if (!empty($ids)) {
+        $to_delete = array_merge($to_delete, $option_storage->loadMultiple($ids));
       }
     }
-    if ($choices) {
-      \Drupal::entityTypeManager()->getStorage('voting_option')->delete($choices);
+    if (!empty($to_delete)) {
+      $option_storage->delete($to_delete);
     }
   }
 
