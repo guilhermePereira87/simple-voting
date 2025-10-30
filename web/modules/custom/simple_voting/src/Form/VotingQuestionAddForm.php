@@ -5,11 +5,44 @@ namespace Drupal\simple_voting\Form;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\file\Entity\File;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Add-only form for VotingQuestion with add-more option rows (title + optional image).
  */
 class VotingQuestionAddForm extends ContentEntityForm {
+
+  /**
+   * The entity type manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected $entityTypeManager;
+
+  /**
+   * File usage service.
+   *
+   * @var \Drupal\file\FileUsage\FileUsageInterface
+   */
+  protected $fileUsage;
+
+  /**
+   * Logger channel.
+   *
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    $instance = parent::create($container);
+    $instance->entityTypeManager = $container->get('entity_type.manager');
+    $instance->fileUsage = $container->get('file.usage');
+    $instance->logger = $container->get('logger.factory')->get('simple_voting');
+    return $instance;
+  }
 
   /**
    * {@inheritdoc}
@@ -35,7 +68,6 @@ class VotingQuestionAddForm extends ContentEntityForm {
     ];
 
     // We manage options directly on the voting_option entity via question_id.
-
     $num = $form_state->get('num_options');
     if ($num === NULL) {
       $num = 1;
@@ -130,9 +162,9 @@ class VotingQuestionAddForm extends ContentEntityForm {
       return;
     }
 
-    $optionStorage = \Drupal::entityTypeManager()->getStorage('voting_option');
-    $fileStorage = \Drupal::entityTypeManager()->getStorage('file');
-    $fileUsage = \Drupal::service('file.usage');
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $fileStorage = $this->entityTypeManager->getStorage('file');
+    $fileUsage = $this->fileUsage;
     $createdIds = [];
 
     foreach ($options as $optionData) {
@@ -170,7 +202,7 @@ class VotingQuestionAddForm extends ContentEntityForm {
             $fields['image'] = [['target_id' => $file->id()]];
           }
           else {
-            \Drupal::logger('simple_voting')->warning('Discarding uploaded file %name due to disallowed extension.', ['%name' => $file->getFilename()]);
+            $this->logger->warning('Discarding uploaded file %name due to disallowed extension.', ['%name' => $file->getFilename()]);
             $file = NULL;
           }
         }
@@ -188,8 +220,7 @@ class VotingQuestionAddForm extends ContentEntityForm {
 
     // Options are already created with 'question_id' set; no mirrored
     // references are maintained on the question entity.
-
-    \Drupal::messenger()->addMessage($this->t('Voting question created with @count options.', ['@count' => count($createdIds)]));
+    $this->messenger()->addMessage($this->t('Voting question created with @count options.', ['@count' => count($createdIds)]));
 
     $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $question->id()]);
   }

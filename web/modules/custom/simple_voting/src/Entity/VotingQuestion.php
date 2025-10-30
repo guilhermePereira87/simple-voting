@@ -4,19 +4,15 @@ namespace Drupal\simple_voting\Entity;
 
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityChangedInterface;
-use Drupal\Core\Entity\EntityOwnerInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityPublishedTrait;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\simple_voting\Access\VotingQuestionAccessControlHandler;
 use Drupal\simple_voting\Traits\EntityChangedTrait;
 use Drupal\simple_voting\Traits\EntityOwnerTrait;
 use Drupal\user\EntityOwnerInterface as UserEntityOwnerInterface;
-use Drupal\user\UserInterface;
 
 /**
  * Defines the VotingQuestion entity.
@@ -63,7 +59,6 @@ use Drupal\user\UserInterface;
  *   }
  * )
  */
-
 class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterface, EntityChangedInterface, EntityPublishedInterface {
   use EntityPublishedTrait;
   use EntityChangedTrait;
@@ -88,7 +83,6 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
       ])
       ->setDisplayConfigurable('form', TRUE)
       ->setDisplayConfigurable('view', TRUE);
-
 
     // Body of the question.
     $fields['question_text'] = BaseFieldDefinition::create('text_long')
@@ -120,7 +114,7 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
       ->setDefaultValueCallback(self::class . '::defaultUserId')
       ->setDescription(new TranslatableMarkup('The owner of the question.'));
 
-    //Last updated.
+    // Last updated.
     $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(new TranslatableMarkup('Last Update'));
 

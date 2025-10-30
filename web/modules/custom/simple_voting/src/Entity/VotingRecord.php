@@ -5,7 +5,6 @@ namespace Drupal\simple_voting\Entity;
 use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
-use Drupal\Core\Entity\EntityOwnerInterface;
 use Drupal\Core\Entity\EntityChangedInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
@@ -43,13 +42,12 @@ use Drupal\user\EntityOwnerInterface as UserEntityOwnerInterface;
  *    }
  * )
  */
+final class VotingRecord extends ContentEntityBase implements UserEntityOwnerInterface, EntityChangedInterface {
+  use StringTranslationTrait;
+  use EntityChangedTrait;
+  use EntityOwnerTrait;
 
- final class VotingRecord extends ContentEntityBase implements UserEntityOwnerInterface, EntityChangedInterface {
-   use StringTranslationTrait;
-   use EntityChangedTrait;
-   use EntityOwnerTrait;
-
-   /**
+  /**
    * {@inheritdoc}
    */
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type): array {
@@ -75,7 +73,7 @@ use Drupal\user\EntityOwnerInterface as UserEntityOwnerInterface;
       ->setSetting('target_type', 'user')
       ->setDescription(new TranslatableMarkup('The user who voted.'));
 
-    //Last updated.
+    // Last updated.
     $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(new TranslatableMarkup('Last Update'));
 
@@ -90,4 +88,4 @@ use Drupal\user\EntityOwnerInterface as UserEntityOwnerInterface;
     return [$currentUser->id()];
   }
 
- }
+}

@@ -4,7 +4,6 @@ namespace Drupal\simple_voting\ListBuilder;
 
 use Drupal\Core\Entity\EntityListBuilder;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Url;
 
 /**
  * Provides a list builder for VotingQuestion entities on the admin collection page.
@@ -24,7 +23,7 @@ class VotingQuestionListBuilder extends EntityListBuilder {
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity) {
-    /* @var \Drupal\simple_voting\Entity\VotingQuestion $entity */
+    /** @var \Drupal\simple_voting\Entity\VotingQuestion $entity */
     $row['title'] = $entity->label();
     $ownerEntity = NULL;
     if ($entity->hasField('uid')) {

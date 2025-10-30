@@ -8,7 +8,8 @@ use Drupal\user\UserInterface;
  * Provides shared implementation for EntityOwnerInterface methods.
  */
 trait EntityOwnerTrait {
-    /**
+
+  /**
    * Gets the owner ID.
    *
    * @return \Drupal\user\UserInterface|null
@@ -36,7 +37,6 @@ trait EntityOwnerTrait {
    * Gets the owner ID.
    *
    * @return int|null
-   *  
    */
   public function getOwnerId() {
     return $this->get('uid')->target_id;
@@ -55,4 +55,5 @@ trait EntityOwnerTrait {
     $this->set('uid', $uid);
     return $this;
   }
+
 }

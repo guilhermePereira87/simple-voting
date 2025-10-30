@@ -3,12 +3,9 @@
 namespace Drupal\simple_voting\Entity;
 
 use Drupal\Core\Entity\ContentEntityBase;
-use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Entity\EntityChangedInterface;
-use Drupal\Core\Entity\EntityOwnerInterface;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\simple_voting\Traits\EntityChangedTrait;
 
@@ -58,8 +55,8 @@ final class VotingOption extends ContentEntityBase implements EntityChangedInter
       ->setLabel(new TranslatableMarkup('Option Text'))
       ->setRequired(FALSE)
       ->setDescription(new TranslatableMarkup('A detailed description of the option.'));
-    
-    // Optional image
+
+    // Optional image.
     $fields['image'] = BaseFieldDefinition::create('image')
       ->setLabel(new TranslatableMarkup('Option Image'))
       ->setRequired(FALSE)

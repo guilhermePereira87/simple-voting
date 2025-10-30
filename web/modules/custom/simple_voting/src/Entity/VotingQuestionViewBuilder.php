@@ -4,13 +4,54 @@ namespace Drupal\simple_voting\Entity;
 
 use Drupal\Core\Entity\EntityViewBuilder;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Url;
 use Drupal\Component\Utility\Xss;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Custom view builder for VotingQuestion.
  */
 class VotingQuestionViewBuilder extends EntityViewBuilder {
+
+  /**
+   * The entity type manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected $entityTypeManager;
+
+  /**
+   * The form builder service.
+   *
+   * @var \Drupal\Core\Form\FormBuilderInterface
+   */
+  protected $formBuilder;
+
+  /**
+   * File URL generator.
+   *
+   * @var \Drupal\Core\File\FileUrlGeneratorInterface
+   */
+  protected $fileUrlGenerator;
+
+  /**
+   * Current user.
+   *
+   * @var \Drupal\Core\Session\AccountProxyInterface
+   */
+  protected $currentUser;
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function createInstance(ContainerInterface $container, $entity_type) {
+    $instance = parent::createInstance($container, $entity_type);
+    // Inject commonly used services to avoid Drupal:: calls inside view().
+    $instance->entityTypeManager = $container->get('entity_type.manager');
+    $instance->formBuilder = $container->get('form_builder');
+    $instance->fileUrlGenerator = $container->get('file_url_generator');
+    $instance->currentUser = $container->get('current_user');
+    return $instance;
+  }
 
   /**
    * {@inheritdoc}
@@ -23,12 +64,12 @@ class VotingQuestionViewBuilder extends EntityViewBuilder {
       return $build;
     }
 
-    /* @var \Drupal\simple_voting\Entity\VotingQuestion $entity */
+    /** @var \Drupal\simple_voting\Entity\VotingQuestion $entity */
     // Prepare options render array.
     $optionsItems = [];
     // Load voting_option entities that reference this question.
     $optionEntities = [];
-    $optionStorage = \Drupal::entityTypeManager()->getStorage('voting_option');
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
     $ids = $optionStorage->getQuery()
       ->condition('question_id', $entity->id())
       ->accessCheck(FALSE)
@@ -39,10 +80,11 @@ class VotingQuestionViewBuilder extends EntityViewBuilder {
     }
 
     // Determine whether the current user has voted on this question.
-    $currentUser = \Drupal::currentUser();
+    $currentUser = $this->currentUser;
     $hasVoted = FALSE;
     if ($currentUser->isAuthenticated()) {
-      $records = \Drupal::entityTypeManager()->getStorage('voting_record')->loadByProperties([
+      $recordStorage = $this->entityTypeManager->getStorage('voting_record');
+      $records = $recordStorage->loadByProperties([
         'question_id' => $entity->id(),
         'uid' => $currentUser->id(),
       ]);
@@ -51,7 +93,7 @@ class VotingQuestionViewBuilder extends EntityViewBuilder {
 
     // If the user hasn't voted, render the voting form (so they can vote).
     if (!$hasVoted) {
-      $build['vote_form'] = \Drupal::formBuilder()->getForm('Drupal\simple_voting\Form\VoteRecordForm', $entity);
+      $build['vote_form'] = $this->formBuilder->getForm('Drupal\simple_voting\Form\VoteRecordForm', $entity);
       return $build;
     }
 
@@ -64,7 +106,7 @@ class VotingQuestionViewBuilder extends EntityViewBuilder {
       // Load voting_record entities for this question and group counts by
       // option_id. We use entity storage here to avoid DB driver-specific
       // chaining issues and keep the code robust.
-      $recordStorage = \Drupal::entityTypeManager()->getStorage('voting_record');
+      $recordStorage = $this->entityTypeManager->getStorage('voting_record');
       $records = $recordStorage->loadByProperties(['question_id' => $entity->id()]);
       foreach ($records as $rec) {
         // `option_id` is an entity reference base field; get its target id.
@@ -83,10 +125,10 @@ class VotingQuestionViewBuilder extends EntityViewBuilder {
       $imageMarkup = '';
       if ($optEntity->hasField('image') && !$optEntity->get('image')->isEmpty()) {
         $fid = $optEntity->get('image')->target_id;
-        $file = \Drupal::entityTypeManager()->getStorage('file')->load($fid);
+        $file = $this->entityTypeManager->getStorage('file')->load($fid);
         if ($file) {
           $uri = $file->getFileUri();
-          $url = \Drupal::service('file_url_generator')->generateAbsoluteString($uri);
+          $url = $this->fileUrlGenerator->generateAbsoluteString($uri);
           $imageMarkup = '<img src="' . $url . '" alt="' . Xss::filterAdmin($title) . '" class="voting-option-image" />';
         }
       }
