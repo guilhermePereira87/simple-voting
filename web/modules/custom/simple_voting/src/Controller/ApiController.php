@@ -200,10 +200,14 @@ class ApiController extends ControllerBase {
     }
 
     // Determine whether results are visible for this question.
-    $showResults = ($question->hasField('show_results') && !$question->get('show_results')->isEmpty()) ? (bool) $question->get('show_results')->value : FALSE;
+    $showResults = FALSE;
+    if ($question->hasField('show_results') && !$question->get('show_results')->isEmpty()) {
+      $showResults = (bool) $question->get('show_results')->value;
+    }
+
     $currentUser = $this->currentUser;
     // Allow access if show_results is true or the current user has an administrative permission.
-    if (!$showResults && !$currentUser->hasPermission('administer site configuration')) {
+    if (!$showResults || !$currentUser->hasPermission('administer site configuration')) {
       return new JsonResponse(['error' => 'Results are not available for this question'], 403);
     }
 
@@ -250,58 +254,6 @@ class ApiController extends ControllerBase {
     ];
 
     return new JsonResponse(['data' => $data]);
-  }
-
-  /**
-   * Authenticate a user and start a session.
-   *
-   * Expects JSON body: { "name": "username", "pass": "password" }
-   * Returns 200 on success and sets the session cookie. Returns 401 on failure.
-   */
-  public function login(Request $request) {
-    // Accept JSON or form-encoded bodies.
-    $data = [];
-    $content = $request->getContent();
-    if (!empty($content)) {
-      $decoded = json_decode($content, TRUE);
-      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-        $data = $decoded;
-      }
-    }
-    // Fallback to request parameters if not JSON.
-    if (empty($data)) {
-      $data['name'] = $request->request->get('name');
-      $data['pass'] = $request->request->get('pass');
-    }
-
-    $name = $data['name'] ?? NULL;
-    $pass = $data['pass'] ?? NULL;
-    if (empty($name) || empty($pass)) {
-      return new JsonResponse(['error' => 'Missing credentials'], 400);
-    }
-
-    try {
-      $auth = $this->userAuth;
-      $uid = $auth->authenticate($name, $pass);
-      if ($uid === FALSE || $uid === 0) {
-        return new JsonResponse(['error' => 'Invalid credentials'], 401);
-      }
-
-      // Load user entity and finalize login (sets session, cookies, etc.).
-      $account = User::load($uid);
-      if (!$account instanceof UserInterface) {
-        return new JsonResponse(['error' => 'Invalid user account'], 401);
-      }
-
-      // Finalize login: sets current user in session and sends cookie in response.
-      user_login_finalize($account);
-
-      return new JsonResponse(['status' => 'ok', 'uid' => $uid]);
-    }
-    catch (\Exception $e) {
-      $this->logger->error('Login error: @msg', ['@msg' => $e->getMessage()]);
-      return new JsonResponse(['error' => 'Internal server error'], 500);
-    }
   }
 
   /**
@@ -387,13 +339,63 @@ class ApiController extends ControllerBase {
       return new JsonResponse(['status' => 'ok', 'vote_id' => $record->id()], 201);
     }
     catch (\Exception $e) {
-      // Detect common duplicate/constraint DB error (SQLSTATE 23000) and map to 409.
       $message = $e->getMessage();
       $code = $e->getCode();
       if (strpos($message, 'Duplicate') !== FALSE || (is_string($code) && strpos($code, '23000') !== FALSE) || $code === 23000) {
         return new JsonResponse(['error' => 'Already voted'], 409);
       }
       $this->logger->error('Unexpected error in API vote: @msg', ['@msg' => $message]);
+      return new JsonResponse(['error' => 'Internal server error'], 500);
+    }
+  }
+
+  /**
+   * Authenticate a user and start a session.
+   *
+   * Expects JSON body: { "name": "username", "pass": "password" }
+   */
+  public function login(Request $request) {
+    // Accept JSON or form-encoded bodies.
+    $data = [];
+    $content = $request->getContent();
+    if (!empty($content)) {
+      $decoded = json_decode($content, TRUE);
+      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $data = $decoded;
+      }
+    }
+    // Fallback to request parameters if not JSON.
+    if (empty($data)) {
+      $data['name'] = $request->request->get('name');
+      $data['pass'] = $request->request->get('pass');
+    }
+
+    $name = $data['name'] ?? NULL;
+    $pass = $data['pass'] ?? NULL;
+    if (empty($name) || empty($pass)) {
+      return new JsonResponse(['error' => 'Missing credentials'], 400);
+    }
+
+    try {
+      $auth = $this->userAuth;
+      $uid = $auth->authenticate($name, $pass);
+      if ($uid === FALSE || $uid === 0) {
+        return new JsonResponse(['error' => 'Invalid credentials'], 401);
+      }
+
+      // Load user entity and finalize login (sets session, cookies, etc.).
+      $account = User::load($uid);
+      if (!$account instanceof UserInterface) {
+        return new JsonResponse(['error' => 'Invalid user account'], 401);
+      }
+
+      // Finalize login: sets current user in session and sends cookie in response.
+      user_login_finalize($account);
+
+      return new JsonResponse(['status' => 'ok', 'uid' => $uid]);
+    }
+    catch (\Exception $e) {
+      $this->logger->error('Login error: @msg', ['@msg' => $e->getMessage()]);
       return new JsonResponse(['error' => 'Internal server error'], 500);
     }
   }
