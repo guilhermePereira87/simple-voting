@@ -6,7 +6,9 @@ use Drupal\Core\Entity\EntityListBuilder;
 use Drupal\Core\Entity\EntityInterface;
 
 /**
- * Provides a list builder for VotingQuestion entities on the admin collection page.
+ * Provides a list builder for VotingQuestion entities.
+ *
+ * Used on the admin collection page.
  */
 class VotingQuestionListBuilder extends EntityListBuilder {
 
