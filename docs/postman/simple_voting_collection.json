@@ -1,0 +1,252 @@
+{
+	"info": {
+		"_postman_id": "e6bff3d1-2135-4420-b9a4-20aa45cb6d35",
+		"name": "Simple Voting Collection",
+		"description": "### Welcome to Postman! This is your first collection. \n\nCollections are your starting point for building and testing APIs. You can use this one to:\n\n• Group related requests\n• Test your API in real-world scenarios\n• Document and share your requests\n\nUpdate the name and overview whenever you’re ready to make it yours.\n\n[Learn more about Postman Collections.](https://learning.postman.com/docs/collections/collections-overview/)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "49655063",
+		"_collection_link": "https://guilhermepereira87-805737.postman.co/workspace/Guilherme-Pereira's-Workspace~ecb2bbef-010e-43f8-8afc-376a1da192ed/collection/49655063-e6bff3d1-2135-4420-b9a4-20aa45cb6d35?action=share&source=collection_link&creator=49655063"
+	},
+	"item": [
+		{
+			"name": "auth",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\"name\": \"{{user_name}}\",\r\n\"pass\": \"{{user_password}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}api/v1/auth/login"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "vote-resources",
+			"item": [
+				{
+					"name": "get-question-collection",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}api/v1/questions",
+						"description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+					},
+					"response": [
+						{
+							"name": "Get data",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": "{{base_url}}api/v1/questions"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": null,
+							"header": [
+								{
+									"key": "Cache-Control",
+									"value": "must-revalidate, no-cache, private"
+								},
+								{
+									"key": "Content-Language",
+									"value": "pt-br"
+								},
+								{
+									"key": "Content-Length",
+									"value": "140"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 29 Oct 2025 19:23:11 GMT"
+								},
+								{
+									"key": "Expires",
+									"value": "Sun, 19 Nov 1978 05:00:00 GMT"
+								},
+								{
+									"key": "Server",
+									"value": "Apache/2.4.62 (Debian)"
+								},
+								{
+									"key": "X-Content-Type-Options",
+									"value": "nosniff"
+								},
+								{
+									"key": "X-Drupal-Cache",
+									"value": "UNCACHEABLE (no cacheability)"
+								},
+								{
+									"key": "X-Drupal-Dynamic-Cache",
+									"value": "UNCACHEABLE (no cacheability)"
+								},
+								{
+									"key": "X-Frame-Options",
+									"value": "SAMEORIGIN"
+								},
+								{
+									"key": "X-Generator",
+									"value": "Drupal 11 (https://www.drupal.org)"
+								},
+								{
+									"key": "X-Powered-By",
+									"value": "PHP/8.3.23"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"data\": [\n        {\n            \"id\": \"1\",\n            \"title\": \"Cyberpunk 2077\",\n            \"question_text\": \"<p>What is your favorite image?</p>\"\n        }\n    ],\n    \"meta\": {\n        \"count\": 1\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "vote",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Successful POST request\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+									"});",
+									""
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"name\": \"Add your name in the body\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "",
+						"description": "This is a POST request, submitting data to an API via the request body. This request submits JSON data, and the data is reflected in the response.\n\nA successful POST request typically returns a `200 OK` or `201 Created` response code."
+					},
+					"response": []
+				},
+				{
+					"name": "get-question-by-id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}api/v1/questions/{question_id}"
+					},
+					"response": [
+						{
+							"name": "New Request",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": "{{base_url}}api/v1/questions/1"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": null,
+							"header": [
+								{
+									"key": "Cache-Control",
+									"value": "must-revalidate, no-cache, private"
+								},
+								{
+									"key": "Content-Language",
+									"value": "pt-br"
+								},
+								{
+									"key": "Content-Length",
+									"value": "864"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								},
+								{
+									"key": "Date",
+									"value": "Wed, 29 Oct 2025 19:23:09 GMT"
+								},
+								{
+									"key": "Expires",
+									"value": "Sun, 19 Nov 1978 05:00:00 GMT"
+								},
+								{
+									"key": "Server",
+									"value": "Apache/2.4.62 (Debian)"
+								},
+								{
+									"key": "X-Content-Type-Options",
+									"value": "nosniff"
+								},
+								{
+									"key": "X-Drupal-Cache",
+									"value": "UNCACHEABLE (no cacheability)"
+								},
+								{
+									"key": "X-Drupal-Dynamic-Cache",
+									"value": "UNCACHEABLE (no cacheability)"
+								},
+								{
+									"key": "X-Frame-Options",
+									"value": "SAMEORIGIN"
+								},
+								{
+									"key": "X-Generator",
+									"value": "Drupal 11 (https://www.drupal.org)"
+								},
+								{
+									"key": "X-Powered-By",
+									"value": "PHP/8.3.23"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"data\": {\n        \"id\": \"1\",\n        \"title\": \"Cyberpunk 2077\",\n        \"question_text\": \"<p>What is your favorite image?</p>\",\n        \"options\": [\n            {\n                \"id\": \"1\",\n                \"title\": \"Image A\",\n                \"description\": \"Motorcycle\",\n                \"image_url\": \"https://votacao-simples.lndo.site/sites/default/files/voting_option_images/photomode_10102023_205610_2.png\"\n            },\n            {\n                \"id\": \"2\",\n                \"title\": \"Image B\",\n                \"description\": \"Car Style\",\n                \"image_url\": \"https://votacao-simples.lndo.site/sites/default/files/voting_option_images/photomode_29102023_162820_0.png\"\n            },\n            {\n                \"id\": \"3\",\n                \"title\": \"Image C\",\n                \"description\": \"Enemy\",\n                \"image_url\": \"https://votacao-simples.lndo.site/sites/default/files/voting_option_images/photomode_03102023_001138_2.png\"\n            },\n            {\n                \"id\": \"4\",\n                \"title\": \"Image D\",\n                \"description\": \"Stealth action.\",\n                \"image_url\": \"https://votacao-simples.lndo.site/sites/default/files/voting_option_images/photomode_30092023_000403.png\"\n            }\n        ]\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "get-results",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}api/v1/questions/{{question_id}}/results"
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
