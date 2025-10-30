@@ -6,10 +6,11 @@ namespace Drupal\simple_voting\Traits;
  * Provides shared implementation for EntityChangedInterface methods.
  */
 trait EntityChangedTrait {
+
   /**
    * {@inheritdoc}
    */
-  public function getChangedTime(): int{
+  public function getChangedTime(): int {
     return (int) $this->get('changed')->value;
   }
 
@@ -25,6 +26,7 @@ trait EntityChangedTrait {
    * {@inheritdoc}
    */
   public function getChangedTimeAcrossTranslations(): int {
-  return (int) $this->getUntranslated()->get('changed')->value;
+    return (int) $this->getUntranslated()->get('changed')->value;
   }
+
 }
