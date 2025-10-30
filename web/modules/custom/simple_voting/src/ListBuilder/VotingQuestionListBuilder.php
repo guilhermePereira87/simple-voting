@@ -26,11 +26,11 @@ class VotingQuestionListBuilder extends EntityListBuilder {
   public function buildRow(EntityInterface $entity) {
     /* @var \Drupal\simple_voting\Entity\VotingQuestion $entity */
     $row['title'] = $entity->label();
-    $owner_entity = NULL;
+    $ownerEntity = NULL;
     if ($entity->hasField('uid')) {
-      $owner_entity = $entity->get('uid')->entity;
+      $ownerEntity = $entity->get('uid')->entity;
     }
-    $row['author'] = $owner_entity ? $owner_entity->getAccountName() : '';
+    $row['author'] = $ownerEntity ? $ownerEntity->getAccountName() : '';
 
     // Let the parent add default operations column (Edit/Delete) and other
     // default cells (if any).

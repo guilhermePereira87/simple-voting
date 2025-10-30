@@ -141,19 +141,19 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
     parent::postDelete($storage, $entities);
 
     // Delete voting_option entities that reference the deleted question(s).
-    $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-    $to_delete = [];
+    $optionStorage = \Drupal::entityTypeManager()->getStorage('voting_option');
+    $toDelete = [];
     foreach ($entities as $entity) {
-      $ids = $option_storage->getQuery()
+      $ids = $optionStorage->getQuery()
         ->condition('question_id', $entity->id())
         ->accessCheck(FALSE)
         ->execute();
       if (!empty($ids)) {
-        $to_delete = array_merge($to_delete, $option_storage->loadMultiple($ids));
+        $toDelete = array_merge($toDelete, $optionStorage->loadMultiple($ids));
       }
     }
-    if (!empty($to_delete)) {
-      $option_storage->delete($to_delete);
+    if (!empty($toDelete)) {
+      $optionStorage->delete($toDelete);
     }
   }
 

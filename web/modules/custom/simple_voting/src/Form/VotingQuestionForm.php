@@ -20,12 +20,12 @@ class VotingQuestionForm extends ContentEntityForm {
     $default = '';
     if (!$entity->isNew()) {
       $storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-  $ids = $storage->getQuery()->condition('question_id', $entity->id())->accessCheck(FALSE)->execute();
-      if (!empty($ids)) {
-        $opts = $storage->loadMultiple($ids);
+  $optIds = $storage->getQuery()->condition('question_id', $entity->id())->accessCheck(FALSE)->execute();
+      if (!empty($optIds)) {
+        $optEntities = $storage->loadMultiple($optIds);
         $titles = [];
-        foreach ($opts as $opt) {
-          $titles[] = $opt->label();
+        foreach ($optEntities as $optEntity) {
+          $titles[] = $optEntity->label();
         }
         $default = implode("\n", $titles);
       }
@@ -53,14 +53,14 @@ class VotingQuestionForm extends ContentEntityForm {
     $value = $form_state->getValue('choice_textarea');
     if (is_string($value)) {
       $lines = array_filter(array_map('trim', preg_split('/\r?\n/', $value)), function($v) { return $v !== ''; });
-      $storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-      $target_ids = [];
-      foreach ($lines as $title) {
+  $storage = \Drupal::entityTypeManager()->getStorage('voting_option');
+  $targetIds = [];
+  foreach ($lines as $title) {
         // Try reuse an existing option for this question with same title.
         $matches = $storage->loadByProperties(['title' => $title, 'question_id' => $entity->id()]);
         if ($matches) {
           $opt = reset($matches);
-          $target_ids[] = $opt->id();
+          $targetIds[] = $opt->id();
           continue;
         }
 
@@ -69,12 +69,12 @@ class VotingQuestionForm extends ContentEntityForm {
           'question_id' => $entity->id(),
         ]);
         $opt->save();
-        $target_ids[] = $opt->id();
+        $targetIds[] = $opt->id();
       }
 
       $refs = [];
-      foreach ($target_ids as $tid) {
-        $refs[] = ['target_id' => $tid];
+      foreach ($targetIds as $targetId) {
+        $refs[] = ['target_id' => $targetId];
       }
   // Options are created with question_id; we do not mirror refs on the
   // question entity.

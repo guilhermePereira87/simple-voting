@@ -130,13 +130,13 @@ class VotingQuestionAddForm extends ContentEntityForm {
       return;
     }
 
-    $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-    $file_storage = \Drupal::entityTypeManager()->getStorage('file');
-    $file_usage = \Drupal::service('file.usage');
-    $created_ids = [];
+    $optionStorage = \Drupal::entityTypeManager()->getStorage('voting_option');
+    $fileStorage = \Drupal::entityTypeManager()->getStorage('file');
+    $fileUsage = \Drupal::service('file.usage');
+    $createdIds = [];
 
-    foreach ($options as $opt) {
-      $title = trim($opt['title'] ?? '');
+    foreach ($options as $optionData) {
+      $title = trim($optionData['title'] ?? '');
       if ($title === '') {
         continue;
       }
@@ -147,19 +147,19 @@ class VotingQuestionAddForm extends ContentEntityForm {
       ];
 
       // Optional description text.
-      $text = trim($opt['description'] ?? '');
+      $text = trim($optionData['description'] ?? '');
       if ($text !== '') {
         $fields['text'] = [['value' => $text]];
       }
 
       $fid = NULL;
       $file = NULL;
-      if (!empty($opt['image']) && is_array($opt['image'])) {
-        $fid = reset($opt['image']);
+      if (!empty($optionData['image']) && is_array($optionData['image'])) {
+        $fid = reset($optionData['image']);
       }
 
       if ($fid) {
-        $file = $file_storage->load($fid);
+        $file = $fileStorage->load($fid);
         if ($file instanceof File) {
           // Validate extension manually to avoid relying on upload validator plugin.
           $allowed = ['png', 'jpg', 'jpeg', 'gif'];
@@ -176,20 +176,20 @@ class VotingQuestionAddForm extends ContentEntityForm {
         }
       }
 
-      $option = $option_storage->create($fields);
+      $option = $optionStorage->create($fields);
       $option->save();
 
       if ($file instanceof File) {
-        $file_usage->add($file, 'simple_voting', 'voting_option', $option->id());
+        $fileUsage->add($file, 'simple_voting', 'voting_option', $option->id());
       }
 
-      $created_ids[] = $option->id();
+      $createdIds[] = $option->id();
     }
 
     // Options are already created with 'question_id' set; no mirrored
     // references are maintained on the question entity.
 
-    \Drupal::messenger()->addMessage($this->t('Voting question created with @count options.', ['@count' => count($created_ids)]));
+    \Drupal::messenger()->addMessage($this->t('Voting question created with @count options.', ['@count' => count($createdIds)]));
 
     $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $question->id()]);
   }
