@@ -161,6 +161,14 @@ class VotingQuestionEditForm extends ContentEntityForm {
 
   /**
    * Ajax callback for add-more.
+   *
+   * @param array $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return array $form
+   *   The built form array.
    */
   public function ajaxCallback(array &$form, FormStateInterface $form_state) {
     return $form['options'];
@@ -168,6 +176,14 @@ class VotingQuestionEditForm extends ContentEntityForm {
 
   /**
    * Submit handler to add one more option row and rebuild the form.
+   *
+   * @param array $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return array $form
+   *   The built form array.
    */
   public function addOne(array &$form, FormStateInterface $form_state) {
     $num = $form_state->get('num_options') ?: 0;
@@ -265,7 +281,7 @@ class VotingQuestionEditForm extends ContentEntityForm {
         $kept[] = $opt->id();
       }
       else {
-        // Create new option only when title is provided (image is optional).
+        // Create new option only when title is provided.
         if ($title === '') {
           continue;
         }
@@ -284,8 +300,8 @@ class VotingQuestionEditForm extends ContentEntityForm {
               $fields['image'] = [['target_id' => $file->id()]];
             }
             else {
-              // If uploaded file has disallowed extension, ignore the image but still
-              // allow creating/updating the option based on title.
+              // If uploaded file has disallowed extension, ignore the image.
+              // Still allow creating/updating the option based on title.
               $file = NULL;
             }
           }

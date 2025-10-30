@@ -73,7 +73,9 @@ class VotingQuestionVoteForm extends FormBase {
    * Build the vote form.
    *
    * @param array $form
+   *   The form array.
    * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
    * @param \Drupal\simple_voting\Entity\VotingQuestion|null $question
    *   The question entity passed from the view builder.
    */
@@ -84,7 +86,7 @@ class VotingQuestionVoteForm extends FormBase {
 
     $currentUser = $this->currentUser;
 
-    // Ensure only authenticated users can vote (adjust if anonymous voting is desired).
+    // Ensure only authenticated users can vote.
     if (!$currentUser->isAuthenticated()) {
       $form['login_notice'] = [
         '#markup' => $this->t('You must be logged in to vote.'),
@@ -127,7 +129,12 @@ class VotingQuestionVoteForm extends FormBase {
       foreach ($options as $optEntity) {
         $title = Xss::filterAdmin($optEntity->label());
         $count = $counts[$optEntity->id()] ?? 0;
-        $items[] = Markup::create('<div class="voting-result"><div class="voting-result-title">' . $title . '</div><div class="voting-result-count">' . $this->t('@count votes', ['@count' => $count]) . '</div></div>');
+        $items[] = Markup::create(
+          '<div class="voting-result">' .
+          '<div class="voting-result-title">' . $title . '</div>' .
+          '<div class="voting-result-count">' . $this->t('@count votes', ['@count' => $count]) . '</div>' .
+          '</div>'
+        );
       }
 
       $form['results'] = [
@@ -164,7 +171,8 @@ class VotingQuestionVoteForm extends FormBase {
         if ($file) {
           $uri = $file->getFileUri();
           $url = $this->fileUrlGenerator->generateAbsoluteString($uri);
-          $label = '<img src="' . $url . '" class="voting-option-image" alt="' . Xss::filterAdmin($label) . '"/> ' . $label;
+          $label = '<img src="' . $url . '" class="voting-option-image" alt="' . Xss::filterAdmin($label) . '"/> '
+            . $label;
         }
       }
       $radios[$optEntity->id()] = Markup::create($label);
@@ -196,7 +204,7 @@ class VotingQuestionVoteForm extends FormBase {
   public function validateForm(array &$form, FormStateInterface $form_state) {
     $questionId = $form_state->getValue('question_id');
     $optionVal = $form_state->getValue('option');
-    // Basic validation: ensure option exists and belongs to the provided question.
+    // Basic validation: ensure option exists and belongs to the question.
     if (empty($optionVal) || empty($questionId)) {
       $form_state->setErrorByName('option', $this->t('Please select an option.'));
       return;
@@ -216,7 +224,7 @@ class VotingQuestionVoteForm extends FormBase {
     $optionVal = $form_state->getValue('option');
     $currentUser = $this->currentUser;
 
-    // Prevent double-voting using a uniqueness check (the entity also has a constraint).
+    // Prevent double-voting; the entity also defines a uniqueness constraint.
     $recordStorage = $this->entityTypeManager->getStorage('voting_record');
     $existing = $recordStorage->loadByProperties([
       'question_id' => $questionId,

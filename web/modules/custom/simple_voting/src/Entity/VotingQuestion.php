@@ -124,13 +124,6 @@ class VotingQuestion extends ContentEntityBase implements UserEntityOwnerInterfa
   /**
    * {@inheritdoc}
    */
-  public function preSave(EntityStorageInterface $storage) {
-    parent::preSave($storage);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public static function postDelete(EntityStorageInterface $storage, array $entities) {
     parent::postDelete($storage, $entities);
 

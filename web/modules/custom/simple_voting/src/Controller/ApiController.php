@@ -90,6 +90,11 @@ class ApiController extends ControllerBase {
 
   /**
    * Return a JSON list of published voting questions and their options.
+   *
+   * GET /api/v1/questions.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   The JSON response containing the list of questions and options.
    */
   public function questions() {
     $questionStorage = $this->entityTypeManager->getStorage('voting_question');
@@ -116,10 +121,10 @@ class ApiController extends ControllerBase {
           'show_results' => ($q->hasField('show_results') && !$q->get('show_results')->isEmpty()) ? (bool) $q->get('show_results')->value : FALSE,
         ];
 
-        // For this minimal endpoint we only return the basic question data
-        // (id, title and question_text). Options are intentionally not
-        // included to keep the response small and simple.
-        $qItem['question_text'] = ($q->hasField('question_text') && !$q->get('question_text')->isEmpty()) ? $q->get('question_text')->value : '';
+        // Return only basic question data (id, title, question_text).
+        // Options are intentionally omitted to keep the response small.
+        $qItem['question_text'] = ($q->hasField('question_text') && !$q->get('question_text')->isEmpty())
+          ? $q->get('question_text')->value : '';
         $questions[] = [
           'id' => $qItem['id'],
           'title' => $qItem['title'],
@@ -128,11 +133,23 @@ class ApiController extends ControllerBase {
       }
     }
 
-    return new JsonResponse(['data' => $questions, 'meta' => ['count' => count($questions)]]);
+    $response = [
+      'data' => $questions,
+      'meta' => ['count' => count($questions)],
+    ];
+    return new JsonResponse($response);
   }
 
   /**
    * Return the question JSON especified by ID.
+   *
+   * GET /api/v1/questions/{id}.
+   *
+   * @param int $id
+   *   The question ID.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   The JSON response containing the question and its options.
    */
   public function getQuestionById($id) {
     $questionStorage = $this->entityTypeManager->getStorage('voting_question');
@@ -191,6 +208,12 @@ class ApiController extends ControllerBase {
    * Return voting results for a question if allowed.
    *
    * GET /api/v1/questions/{id}/results.
+   *
+   * @param int $id
+   *   The question ID.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   The JSON response containing the voting results.
    */
   public function getQuestionResults($id) {
     $questionStorage = $this->entityTypeManager->getStorage('voting_question');
@@ -206,7 +229,8 @@ class ApiController extends ControllerBase {
     }
 
     $currentUser = $this->currentUser;
-    // Allow access if show_results is true or the current user has an administrative permission.
+    // Allow access only when show_results is true or the current user has the
+    // administrative permission required to view results.
     if (!$showResults || !$currentUser->hasPermission('administer site configuration')) {
       return new JsonResponse(['error' => 'Results are not available for this question'], 403);
     }
@@ -258,6 +282,16 @@ class ApiController extends ControllerBase {
 
   /**
    * Vote in a question when applicable.
+   *
+   * POST /api/v1/vote/{questionId}/{optionId}.
+   *
+   * @param int $questionId
+   *   The question ID.
+   * @param int $optionId
+   *   The option ID.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   The JSON response indicating success or failure.
    */
   public function vote($questionId, $optionId) {
     try {
@@ -341,7 +375,10 @@ class ApiController extends ControllerBase {
     catch (\Exception $e) {
       $message = $e->getMessage();
       $code = $e->getCode();
-      if (strpos($message, 'Duplicate') !== FALSE || (is_string($code) && strpos($code, '23000') !== FALSE) || $code === 23000) {
+      $isDuplicate = strpos($message, 'Duplicate') !== FALSE
+        || (is_string($code) && strpos($code, '23000') !== FALSE)
+        || $code === 23000;
+      if ($isDuplicate) {
         return new JsonResponse(['error' => 'Already voted'], 409);
       }
       $this->logger->error('Unexpected error in API vote: @msg', ['@msg' => $message]);
@@ -352,7 +389,14 @@ class ApiController extends ControllerBase {
   /**
    * Authenticate a user and start a session.
    *
+   * POST /api/v1/login.
    * Expects JSON body: { "name": "username", "pass": "password" }
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The current request.
+   *
+   * @return \Symfony\Component\HttpFoundation\JsonResponse
+   *   The JSON response.
    */
   public function login(Request $request) {
     // Accept JSON or form-encoded bodies.
