@@ -68,9 +68,6 @@ class ApiController extends ControllerBase {
     $this->entityTypeManager = $entity_type_manager;
     $this->fileUrlGenerator = $file_url_generator;
     $this->currentUser = $current_user;
-    // Note: we intentionally do not request the global 'entity.query' service
-    // because it may not be available in all runtime environments. Use the
-    // entity type manager storage->getQuery() where needed instead.
     $this->entityQuery = NULL;
     $this->userAuth = $user_auth;
     $this->logger = $logger_factory->get('simple_voting');
@@ -248,10 +245,6 @@ class ApiController extends ControllerBase {
     $totalVotes = 0;
     $counts = [];
     if (!empty($optIds)) {
-      // Count voting_record entities per option using the storage query from
-      // the entity type manager. This does not require the global
-      // 'entity.query' service and works in environments where that service
-      // is not available.
       $recordStorage = $this->entityTypeManager->getStorage('voting_record');
       foreach ($optIds as $optId) {
         $query = $recordStorage->getQuery()
@@ -301,8 +294,7 @@ class ApiController extends ControllerBase {
   public function vote($questionId, $optionId) {
     try {
       $currentUser = $this->currentUser;
-      // Require authenticated user for API voting. Anonymous votes are not allowed
-      // via the API to ensure each vote is attributable to a user.
+      // Require authenticated user for API voting.
       if (!$currentUser->isAuthenticated()) {
         return new JsonResponse(['error' => 'Authentication required'], 401);
       }
