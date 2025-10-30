@@ -2,11 +2,18 @@
 
 namespace Drupal\simple_voting\Controller;
 
+use Drupal\user\Entity\User;
 use Drupal\Core\Controller\ControllerBase;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\user\UserInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\File\FileUrlGeneratorInterface;
+use Drupal\Core\Session\AccountProxyInterface;
+use Drupal\Core\Entity\Query\QueryFactory;
+use Drupal\user\UserAuthInterface;
+use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 
 /**
  * Simple API controller for the simple_voting module.
@@ -21,22 +28,76 @@ class ApiController extends ControllerBase {
   protected $entityTypeManager;
 
   /**
+   * File URL generator service.
+   *
+   * @var \Drupal\Core\File\FileUrlGeneratorInterface
+   */
+  protected $fileUrlGenerator;
+
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountProxyInterface
+   */
+  protected $currentUser;
+
+  /**
+   * Entity query factory.
+   *
+   * @var \Drupal\Core\Entity\Query\QueryFactory
+   */
+  protected $entityQuery;
+
+  /**
+   * User auth service.
+   *
+   * @var \Drupal\user\UserAuthInterface
+   */
+  protected $userAuth;
+
+  /**
+   * Logger channel.
+   *
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
+
+  /**
    * ApiController constructor.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, FileUrlGeneratorInterface $file_url_generator, AccountProxyInterface $current_user, QueryFactory $entity_query, UserAuthInterface $user_auth, LoggerChannelFactoryInterface $logger_factory) {
     $this->entityTypeManager = $entity_type_manager;
+    $this->fileUrlGenerator = $file_url_generator;
+    $this->currentUser = $current_user;
+    $this->entityQuery = $entity_query;
+    $this->userAuth = $user_auth;
+    $this->logger = $logger_factory->get('simple_voting');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('entity_type.manager'),
+      $container->get('file_url_generator'),
+      $container->get('current_user'),
+      $container->get('entity.query'),
+      $container->get('user.auth'),
+      $container->get('logger.factory')
+    );
   }
 
   /**
    * Return a JSON list of published voting questions and their options.
    */
   public function questions() {
-    $question_storage = $this->entityTypeManager->getStorage('voting_question');
-    $option_storage = $this->entityTypeManager->getStorage('voting_option');
-    $file_storage = $this->entityTypeManager->getStorage('file');
+    $questionStorage = $this->entityTypeManager->getStorage('voting_question');
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $fileStorage = $this->entityTypeManager->getStorage('file');
 
     // Load published questions.
-    $ids = $question_storage->getQuery()
+    $ids = $questionStorage->getQuery()
       ->condition('status', 1)
       ->accessCheck(FALSE)
       ->sort('id', 'DESC')
@@ -44,11 +105,11 @@ class ApiController extends ControllerBase {
 
     $questions = [];
     if (!empty($ids)) {
-      $entities = $question_storage->loadMultiple($ids);
+      $entities = $questionStorage->loadMultiple($ids);
       foreach ($entities as $q) {
         /** @var \Drupal\Core\Entity\FieldableEntityInterface $q */
         $qid = $q->id();
-        $q_item = [
+        $qItem = [
           'id' => $qid,
           'title' => $q->label(),
           'question_text' => ($q->hasField('question_text') && !$q->get('question_text')->isEmpty()) ? $q->get('question_text')->value : '',
@@ -58,11 +119,11 @@ class ApiController extends ControllerBase {
         // For this minimal endpoint we only return the basic question data
         // (id, title and question_text). Options are intentionally not
         // included to keep the response small and simple.
-        $q_item['question_text'] = ($q->hasField('question_text') && !$q->get('question_text')->isEmpty()) ? $q->get('question_text')->value : '';
+        $qItem['question_text'] = ($q->hasField('question_text') && !$q->get('question_text')->isEmpty()) ? $q->get('question_text')->value : '';
         $questions[] = [
-          'id' => $q_item['id'],
-          'title' => $q_item['title'],
-          'question_text' => $q_item['question_text'],
+          'id' => $qItem['id'],
+          'title' => $qItem['title'],
+          'question_text' => $qItem['question_text'],
         ];
       }
     }
@@ -74,8 +135,8 @@ class ApiController extends ControllerBase {
    * Return the question JSON especified by ID.
    */
   public function getQuestionById($id) {
-    $question_storage = $this->entityTypeManager()->getStorage('voting_question');
-    $question = $question_storage->load($id);
+    $questionStorage = $this->entityTypeManager->getStorage('voting_question');
+    $question = $questionStorage->load($id);
     if (!$question) {
       return new JsonResponse(['error' => 'Question not found'], 404);
     }
@@ -87,36 +148,36 @@ class ApiController extends ControllerBase {
     ];
 
     // Load options for this question and include them in the response.
-    $option_storage = $this->entityTypeManager->getStorage('voting_option');
-    $file_storage = $this->entityTypeManager->getStorage('file');
-    $opt_ids = $option_storage->getQuery()
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $fileStorage = $this->entityTypeManager->getStorage('file');
+    $optIds = $optionStorage->getQuery()
       ->condition('question_id', $question->id())
       ->accessCheck(FALSE)
       ->sort('id', 'ASC')
       ->execute();
 
     $options = [];
-    if (!empty($opt_ids)) {
-      $opt_entities = $option_storage->loadMultiple($opt_ids);
-      foreach ($opt_entities as $opt) {
+    if (!empty($optIds)) {
+      $optEntities = $optionStorage->loadMultiple($optIds);
+      foreach ($optEntities as $optEntity) {
         /** @var \Drupal\Core\Entity\FieldableEntityInterface $opt */
-        $image_url = NULL;
-        if ($opt->hasField('image') && !$opt->get('image')->isEmpty()) {
-          $fid = $opt->get('image')->target_id;
+        $imageUrl = NULL;
+        if ($optEntity->hasField('image') && !$optEntity->get('image')->isEmpty()) {
+          $fid = $optEntity->get('image')->target_id;
           if ($fid) {
-            $file = $file_storage->load($fid);
+            $file = $fileStorage->load($fid);
             if ($file) {
               $uri = $file->getFileUri();
-              $image_url = \Drupal::service('file_url_generator')->generateAbsoluteString($uri);
+              $imageUrl = $this->fileUrlGenerator->generateAbsoluteString($uri);
             }
           }
         }
 
         $options[] = [
-          'id' => $opt->id(),
-          'title' => $opt->label(),
-          'description' => ($opt->hasField('text') && !$opt->get('text')->isEmpty()) ? $opt->get('text')->value : NULL,
-          'image_url' => $image_url,
+          'id' => $optEntity->id(),
+          'title' => $optEntity->label(),
+          'description' => ($optEntity->hasField('text') && !$optEntity->get('text')->isEmpty()) ? $optEntity->get('text')->value : NULL,
+          'image_url' => $imageUrl,
         ];
       }
     }
@@ -129,54 +190,54 @@ class ApiController extends ControllerBase {
   /**
    * Return voting results for a question if allowed.
    *
-   * GET /api/v1/questions/{id}/results
+   * GET /api/v1/questions/{id}/results.
    */
   public function getQuestionResults($id) {
-    $question_storage = $this->entityTypeManager->getStorage('voting_question');
-    $question = $question_storage->load($id);
+    $questionStorage = $this->entityTypeManager->getStorage('voting_question');
+    $question = $questionStorage->load($id);
     if (!$question) {
       return new JsonResponse(['error' => 'Question not found'], 404);
     }
 
     // Determine whether results are visible for this question.
-    $show_results = ($question->hasField('show_results') && !$question->get('show_results')->isEmpty()) ? (bool) $question->get('show_results')->value : FALSE;
-    $current_user = \Drupal::currentUser();
+    $showResults = ($question->hasField('show_results') && !$question->get('show_results')->isEmpty()) ? (bool) $question->get('show_results')->value : FALSE;
+    $currentUser = $this->currentUser;
     // Allow access if show_results is true or the current user has an administrative permission.
-    if (!$show_results && !$current_user->hasPermission('administer site configuration')) {
+    if (!$showResults && !$currentUser->hasPermission('administer site configuration')) {
       return new JsonResponse(['error' => 'Results are not available for this question'], 403);
     }
 
     // Load options and compute counts.
-    $option_storage = $this->entityTypeManager->getStorage('voting_option');
-    $opt_ids = $option_storage->getQuery()
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $optIds = $optionStorage->getQuery()
       ->condition('question_id', $question->id())
       ->accessCheck(FALSE)
       ->sort('id', 'ASC')
       ->execute();
 
     $options = [];
-    $total_votes = 0;
+    $totalVotes = 0;
     $counts = [];
-    if (!empty($opt_ids)) {
+    if (!empty($optIds)) {
       // Use entityQuery to count voting_record per option.
-      foreach ($opt_ids as $opt_id) {
-        $query = \Drupal::entityQuery('voting_record')
+      foreach ($optIds as $optId) {
+        $query = $this->entityQuery->get('voting_record')
           ->accessCheck(FALSE)
           ->condition('question_id', $question->id())
-          ->condition('option_id', $opt_id)
+          ->condition('option_id', $optId)
           ->count();
         $count = (int) $query->execute();
-        $counts[$opt_id] = $count;
-        $total_votes += $count;
+        $counts[$optId] = $count;
+        $totalVotes += $count;
       }
 
-      $opt_entities = $option_storage->loadMultiple($opt_ids);
-      foreach ($opt_entities as $opt) {
-        $opt_id = $opt->id();
+      $optEntities = $optionStorage->loadMultiple($optIds);
+      foreach ($optEntities as $optEntity) {
+        $optId = $optEntity->id();
         $options[] = [
-          'id' => $opt_id,
-          'title' => $opt->label(),
-          'count' => $counts[$opt_id] ?? 0,
+          'id' => $optId,
+          'title' => $optEntity->label(),
+          'count' => $counts[$optId] ?? 0,
         ];
       }
     }
@@ -184,7 +245,7 @@ class ApiController extends ControllerBase {
     $data = [
       'id' => $question->id(),
       'title' => $question->label(),
-      'total_votes' => $total_votes,
+      'total_votes' => $totalVotes,
       'options' => $options,
     ];
 
@@ -220,14 +281,14 @@ class ApiController extends ControllerBase {
     }
 
     try {
-      $auth = \Drupal::service('user.auth');
+      $auth = $this->userAuth;
       $uid = $auth->authenticate($name, $pass);
       if ($uid === FALSE || $uid === 0) {
         return new JsonResponse(['error' => 'Invalid credentials'], 401);
       }
 
       // Load user entity and finalize login (sets session, cookies, etc.).
-      $account = \Drupal\user\Entity\User::load($uid);
+      $account = User::load($uid);
       if (!$account instanceof UserInterface) {
         return new JsonResponse(['error' => 'Invalid user account'], 401);
       }
@@ -238,7 +299,7 @@ class ApiController extends ControllerBase {
       return new JsonResponse(['status' => 'ok', 'uid' => $uid]);
     }
     catch (\Exception $e) {
-      \Drupal::logger('simple_voting')->error('Login error: @msg', ['@msg' => $e->getMessage()]);
+      $this->logger->error('Login error: @msg', ['@msg' => $e->getMessage()]);
       return new JsonResponse(['error' => 'Internal server error'], 500);
     }
   }
@@ -246,47 +307,47 @@ class ApiController extends ControllerBase {
   /**
    * Vote in a question when applicable.
    */
-  public function vote ($questionId, $optionId) {
+  public function vote($questionId, $optionId) {
     try {
-      $current_user = \Drupal::currentUser();
+      $currentUser = $this->currentUser;
       // Require authenticated user for API voting. Anonymous votes are not allowed
       // via the API to ensure each vote is attributable to a user.
-      if (!$current_user->isAuthenticated()) {
+      if (!$currentUser->isAuthenticated()) {
         return new JsonResponse(['error' => 'Authentication required'], 401);
       }
 
-      $question_storage = $this->entityTypeManager->getStorage('voting_question');
-      $option_storage = $this->entityTypeManager->getStorage('voting_option');
-      $record_storage = $this->entityTypeManager->getStorage('voting_record');
+      $questionStorage = $this->entityTypeManager->getStorage('voting_question');
+      $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+      $recordStorage = $this->entityTypeManager->getStorage('voting_record');
 
       // Validate question and option.
-      $question = $question_storage->load($questionId);
+      $question = $questionStorage->load($questionId);
       if (!$question) {
         return new JsonResponse(['error' => 'Question not found'], 404);
       }
       // Option must exist and belong to the question.
-      $option = $option_storage->load($optionId);
+      $option = $optionStorage->load($optionId);
       if (!$option) {
         return new JsonResponse(['error' => 'Option not found'], 404);
       }
       // Some implementations store question_id as an entity reference field.
       if (method_exists($option, 'hasField') && $option->hasField('question_id')) {
-        $opt_q = NULL;
+        $optQ = NULL;
         if (method_exists($option, 'get')) {
-          $opt_field = $option->get('question_id');
-          if (is_object($opt_field)) {
-            $opt_q = $opt_field->target_id ?? $opt_field->value ?? NULL;
+          $optField = $option->get('question_id');
+          if (is_object($optField)) {
+            $optQ = $optField->target_id ?? $optField->value ?? NULL;
           }
         }
-        if ((string) $opt_q !== (string) $questionId) {
+        if ((string) $optQ !== (string) $questionId) {
           return new JsonResponse(['error' => 'Option does not belong to the question'], 400);
         }
       }
 
       // Check if the current user (authenticated) already voted.
-      if ($current_user->isAuthenticated()) {
-        $uid = $current_user->id();
-        $existing = $record_storage->loadByProperties([
+      if ($currentUser->isAuthenticated()) {
+        $uid = $currentUser->id();
+        $existing = $recordStorage->loadByProperties([
           'question_id' => $questionId,
           'uid' => $uid,
         ]);
@@ -295,7 +356,7 @@ class ApiController extends ControllerBase {
         }
 
         // Create the voting_record for authenticated user.
-        $record = $record_storage->create([
+        $record = $recordStorage->create([
           'question_id' => $questionId,
           'option_id' => $optionId,
           'uid' => $uid,
@@ -307,8 +368,8 @@ class ApiController extends ControllerBase {
 
       // At this point the user is authenticated. Enforce single vote per user
       // and create the voting record with the user's uid.
-      $uid = $current_user->id();
-      $existing = $record_storage->loadByProperties([
+      $uid = $currentUser->id();
+      $existing = $recordStorage->loadByProperties([
         'question_id' => $questionId,
         'uid' => $uid,
       ]);
@@ -316,7 +377,7 @@ class ApiController extends ControllerBase {
         return new JsonResponse(['error' => 'User already voted'], 409);
       }
 
-      $record = $record_storage->create([
+      $record = $recordStorage->create([
         'question_id' => $questionId,
         'option_id' => $optionId,
         'uid' => $uid,
@@ -332,7 +393,7 @@ class ApiController extends ControllerBase {
       if (strpos($message, 'Duplicate') !== FALSE || (is_string($code) && strpos($code, '23000') !== FALSE) || $code === 23000) {
         return new JsonResponse(['error' => 'Already voted'], 409);
       }
-      \Drupal::logger('simple_voting')->error('Unexpected error in API vote: @msg', ['@msg' => $message]);
+      $this->logger->error('Unexpected error in API vote: @msg', ['@msg' => $message]);
       return new JsonResponse(['error' => 'Internal server error'], 500);
     }
   }

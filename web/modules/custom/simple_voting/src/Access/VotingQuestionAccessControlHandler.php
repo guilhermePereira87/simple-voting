@@ -7,6 +7,9 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Access\AccessResult;
 
+/**
+ *
+ */
 class VotingQuestionAccessControlHandler extends EntityAccessControlHandler {
 
   /**
@@ -14,14 +17,14 @@ class VotingQuestionAccessControlHandler extends EntityAccessControlHandler {
    */
   protected function checkAccess(EntityInterface $entity, $operation, AccountInterface $account) {
 
-    //Admins can perform any operation.
+    // Admins can perform any operation.
     if ($account->hasPermission('administer voting questions')) {
       return AccessResult::allowed();
     }
 
-    switch($operation) {
+    switch ($operation) {
       case 'view':
-        //Can be visualized if active.
+        // Can be visualized if active.
         return AccessResult::allowedIf($entity->isPublished());
 
       case 'update':
@@ -40,7 +43,7 @@ class VotingQuestionAccessControlHandler extends EntityAccessControlHandler {
    * {@inheritdoc}
    */
   protected function checkCreateAccess(AccountInterface $account, array $context, $entity_bundle = NULL) {
-    //Users with permission create new questions.
+    // Users with permission create new questions.
     return AccessResult::allowedIfHasPermission($account, 'create voting questions');
   }
 

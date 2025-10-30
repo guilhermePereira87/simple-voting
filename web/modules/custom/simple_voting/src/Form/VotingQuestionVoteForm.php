@@ -7,11 +7,60 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\simple_voting\Entity\VotingQuestion;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Render\Markup;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Form to submit a vote for a VotingQuestion.
  */
 class VotingQuestionVoteForm extends FormBase {
+
+  /**
+   * The entity type manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected $entityTypeManager;
+
+  /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountProxyInterface
+   */
+  protected $currentUser;
+
+  /**
+   * Database connection.
+   *
+   * @var \Drupal\Core\Database\Connection
+   */
+  protected $database;
+
+  /**
+   * File URL generator.
+   *
+   * @var \Drupal\Core\File\FileUrlGeneratorInterface
+   */
+  protected $fileUrlGenerator;
+
+  /**
+   * Logger channel.
+   *
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    $instance = parent::create($container);
+    $instance->entityTypeManager = $container->get('entity_type.manager');
+    $instance->currentUser = $container->get('current_user');
+    $instance->database = $container->get('database');
+    $instance->fileUrlGenerator = $container->get('file_url_generator');
+    $instance->logger = $container->get('logger.factory')->get('simple_voting');
+    return $instance;
+  }
 
   /**
    * {@inheritdoc}
@@ -28,15 +77,15 @@ class VotingQuestionVoteForm extends FormBase {
    * @param \Drupal\simple_voting\Entity\VotingQuestion|null $question
    *   The question entity passed from the view builder.
    */
-  public function buildForm(array $form, FormStateInterface $form_state, VotingQuestion $question = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, ?VotingQuestion $question = NULL) {
     if (!$question) {
       return ['#markup' => $this->t('No question provided.')];
     }
 
-    $current_user = \Drupal::currentUser();
+    $currentUser = $this->currentUser;
 
     // Ensure only authenticated users can vote (adjust if anonymous voting is desired).
-    if (!$current_user->isAuthenticated()) {
+    if (!$currentUser->isAuthenticated()) {
       $form['login_notice'] = [
         '#markup' => $this->t('You must be logged in to vote.'),
         '#weight' => -10,
@@ -45,17 +94,17 @@ class VotingQuestionVoteForm extends FormBase {
     }
 
     // Check if the user already voted.
-    $record_storage = \Drupal::entityTypeManager()->getStorage('voting_record');
-    $existing = $record_storage->loadByProperties([
+    $recordStorage = $this->entityTypeManager->getStorage('voting_record');
+    $existing = $recordStorage->loadByProperties([
       'question_id' => $question->id(),
-      'uid' => $current_user->id(),
+      'uid' => $currentUser->id(),
     ]);
-    $has_voted = !empty($existing);
+    $hasVoted = !empty($existing);
 
     // If user has voted and results should be shown, display results and stop.
-    if ($has_voted && $question->hasField('show_results') && $question->get('show_results')->value) {
+    if ($hasVoted && $question->hasField('show_results') && $question->get('show_results')->value) {
       // Count votes grouped by option.
-      $db = \Drupal::database();
+      $db = $this->database;
       $res = $db->select('voting_record', 'vr')
         ->fields('vr', ['option_id'])
         ->condition('vr.question_id', $question->id())
@@ -68,16 +117,16 @@ class VotingQuestionVoteForm extends FormBase {
       }
 
       $items = [];
-      $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-      $ids = $option_storage->getQuery()
+      $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+      $optIds = $optionStorage->getQuery()
         ->condition('question_id', $question->id())
         ->accessCheck(FALSE)
         ->sort('id', 'ASC')
         ->execute();
-      $options = $option_storage->loadMultiple($ids);
-      foreach ($options as $opt) {
-        $title = Xss::filterAdmin($opt->label());
-        $count = $counts[$opt->id()] ?? 0;
+      $options = $optionStorage->loadMultiple($optIds);
+      foreach ($options as $optEntity) {
+        $title = Xss::filterAdmin($optEntity->label());
+        $count = $counts[$optEntity->id()] ?? 0;
         $items[] = Markup::create('<div class="voting-result"><div class="voting-result-title">' . $title . '</div><div class="voting-result-count">' . $this->t('@count votes', ['@count' => $count]) . '</div></div>');
       }
 
@@ -90,35 +139,35 @@ class VotingQuestionVoteForm extends FormBase {
       return $form;
     }
 
-    if ($has_voted) {
+    if ($hasVoted) {
       // User has voted but results are disabled. Show a thank you message.
       $form['message'] = ['#markup' => $this->t('Thanks for voting.')];
       return $form;
     }
 
     // Build radio options for voting.
-    $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-    $ids = $option_storage->getQuery()
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $optIds = $optionStorage->getQuery()
       ->condition('question_id', $question->id())
       ->accessCheck(FALSE)
       ->sort('id', 'ASC')
       ->execute();
-    $options = $option_storage->loadMultiple($ids);
+    $options = $optionStorage->loadMultiple($optIds);
 
     $radios = [];
-    foreach ($options as $opt) {
-      $label = Xss::filterAdmin($opt->label());
+    foreach ($options as $optEntity) {
+      $label = Xss::filterAdmin($optEntity->label());
       // Add image markup if present.
-      if ($opt->hasField('image') && !$opt->get('image')->isEmpty()) {
-        $fid = $opt->get('image')->target_id;
-        $file = \Drupal::entityTypeManager()->getStorage('file')->load($fid);
+      if ($optEntity->hasField('image') && !$optEntity->get('image')->isEmpty()) {
+        $fid = $optEntity->get('image')->target_id;
+        $file = $this->entityTypeManager->getStorage('file')->load($fid);
         if ($file) {
           $uri = $file->getFileUri();
-          $url = \Drupal::service('file_url_generator')->generateAbsoluteString($uri);
+          $url = $this->fileUrlGenerator->generateAbsoluteString($uri);
           $label = '<img src="' . $url . '" class="voting-option-image" alt="' . Xss::filterAdmin($label) . '"/> ' . $label;
         }
       }
-      $radios[$opt->id()] = Markup::create($label);
+      $radios[$optEntity->id()] = Markup::create($label);
     }
 
     $form['question_id'] = [
@@ -145,16 +194,16 @@ class VotingQuestionVoteForm extends FormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
-    $qid = $form_state->getValue('question_id');
-    $opt = $form_state->getValue('option');
+    $questionId = $form_state->getValue('question_id');
+    $optionVal = $form_state->getValue('option');
     // Basic validation: ensure option exists and belongs to the provided question.
-    if (empty($opt) || empty($qid)) {
+    if (empty($optionVal) || empty($questionId)) {
       $form_state->setErrorByName('option', $this->t('Please select an option.'));
       return;
     }
-    $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-    $option = $option_storage->load($opt);
-    if (!$option || (int) $option->get('question_id')->target_id !== (int) $qid) {
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $option = $optionStorage->load($optionVal);
+    if (!$option || (int) $option->get('question_id')->target_id !== (int) $questionId) {
       $form_state->setErrorByName('option', $this->t('Invalid option selected.'));
     }
   }
@@ -163,32 +212,30 @@ class VotingQuestionVoteForm extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $qid = $form_state->getValue('question_id');
-    $opt = $form_state->getValue('option');
-    $current_user = \Drupal::currentUser();
+    $questionId = $form_state->getValue('question_id');
+    $optionVal = $form_state->getValue('option');
+    $currentUser = $this->currentUser;
 
     // Prevent double-voting using a uniqueness check (the entity also has a constraint).
-    $record_storage = \Drupal::entityTypeManager()->getStorage('voting_record');
-    $existing = $record_storage->loadByProperties([
-      'question_id' => $qid,
-      'uid' => $current_user->id(),
+    $recordStorage = $this->entityTypeManager->getStorage('voting_record');
+    $existing = $recordStorage->loadByProperties([
+      'question_id' => $questionId,
+      'uid' => $currentUser->id(),
     ]);
     if (!empty($existing)) {
       $this->messenger()->addWarning($this->t('You have already voted on this question.'));
       // Redirect back to the question.
-      $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $qid]);
+      $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $questionId]);
       return;
     }
-
-    $record = $record_storage->create([
-      'question_id' => $qid,
-      'option_id' => $opt,
-      'uid' => $current_user->id(),
+    $record = $recordStorage->create([
+      'question_id' => $questionId,
+      'option_id' => $optionVal,
+      'uid' => $currentUser->id(),
     ]);
     $record->save();
-
     $this->messenger()->addStatus($this->t('Your vote has been recorded.'));
-    $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $qid]);
+    $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $questionId]);
   }
 
 }

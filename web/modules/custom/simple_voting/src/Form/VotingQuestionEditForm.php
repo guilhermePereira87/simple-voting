@@ -5,11 +5,44 @@ namespace Drupal\simple_voting\Form;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\file\Entity\File;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Edit form for VotingQuestion that loads linked voting_option entities.
  */
 class VotingQuestionEditForm extends ContentEntityForm {
+
+  /**
+   * The entity type manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected $entityTypeManager;
+
+  /**
+   * File usage service.
+   *
+   * @var \Drupal\file\FileUsage\FileUsageInterface
+   */
+  protected $fileUsage;
+
+  /**
+   * Logger channel.
+   *
+   * @var \Psr\Log\LoggerInterface
+   */
+  protected $logger;
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    $instance = parent::create($container);
+    $instance->entityTypeManager = $container->get('entity_type.manager');
+    $instance->fileUsage = $container->get('file.usage');
+    $instance->logger = $container->get('logger.factory')->get('simple_voting');
+    return $instance;
+  }
 
   /**
    * {@inheritdoc}
@@ -29,29 +62,29 @@ class VotingQuestionEditForm extends ContentEntityForm {
       '#weight' => -90,
     ];
 
-  /* @var \Drupal\simple_voting\Entity\VotingQuestion $question */
-  $question = $this->entity;
+    /** @var \Drupal\simple_voting\Entity\VotingQuestion $question */
+    $question = $this->entity;
     // Load existing options for this question by querying voting_option where
     // question_id == $question->id().
     $existing = [];
     if (!$question->isNew()) {
-      $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-  $ids = $option_storage->getQuery()->condition('question_id', $question->id())->accessCheck(FALSE)->sort('id', 'ASC')->execute();
-      if (!empty($ids)) {
-        $options = $option_storage->loadMultiple($ids);
-        foreach ($options as $opt) {
-          /* @var \Drupal\simple_voting\Entity\VotingOption $opt */
+      $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+      $optIds = $optionStorage->getQuery()->condition('question_id', $question->id())->accessCheck(FALSE)->sort('id', 'ASC')->execute();
+      if (!empty($optIds)) {
+        $options = $optionStorage->loadMultiple($optIds);
+        foreach ($options as $optEntity) {
+          /** @var \Drupal\simple_voting\Entity\VotingOption $opt */
           $fid = NULL;
-          if ($opt->hasField('image') && !$opt->get('image')->isEmpty()) {
-            $fid = $opt->get('image')->target_id;
+          if ($optEntity->hasField('image') && !$optEntity->get('image')->isEmpty()) {
+            $fid = $optEntity->get('image')->target_id;
           }
           $text = '';
-          if ($opt->hasField('text') && !$opt->get('text')->isEmpty()) {
-            $text = $opt->get('text')->value;
+          if ($optEntity->hasField('text') && !$optEntity->get('text')->isEmpty()) {
+            $text = $optEntity->get('text')->value;
           }
           $existing[] = [
-            'id' => $opt->id(),
-            'title' => $opt->label(),
+            'id' => $optEntity->id(),
+            'title' => $optEntity->label(),
             'image' => $fid ? [$fid] : [],
             'description' => $text,
           ];
@@ -155,24 +188,24 @@ class VotingQuestionEditForm extends ContentEntityForm {
     $question = $this->entity;
 
     $submitted = $form_state->getValue('options') ?? [];
-    $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-    $file_storage = \Drupal::entityTypeManager()->getStorage('file');
-    $file_usage = \Drupal::service('file.usage');
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $fileStorage = $this->entityTypeManager->getStorage('file');
+    $fileUsage = $this->fileUsage;
 
     // Track IDs we keep/create so we can update the question references.
     $kept = [];
 
     foreach ($submitted as $row) {
-      $opt_id = $row['option_id'] ?? NULL;
+      $optId = $row['option_id'] ?? NULL;
       $title = trim($row['title'] ?? '');
       $fid = NULL;
       if (!empty($row['image']) && is_array($row['image'])) {
         $fid = reset($row['image']);
       }
 
-      if ($opt_id) {
-        $opt = $option_storage->load($opt_id);
-        /* @var \Drupal\simple_voting\Entity\VotingOption $opt */
+      if ($optId) {
+        $opt = $optionStorage->load($optId);
+        /** @var \Drupal\simple_voting\Entity\VotingOption $opt */
         if (!$opt) {
           // If referenced id doesn't exist, skip.
           continue;
@@ -184,9 +217,9 @@ class VotingQuestionEditForm extends ContentEntityForm {
           if ($opt->hasField('image') && !$opt->get('image')->isEmpty()) {
             $old_fid = $opt->get('image')->target_id;
             if ($old_fid) {
-              $old_file = $file_storage->load($old_fid);
+              $old_file = $fileStorage->load($old_fid);
               if ($old_file) {
-                $file_usage->delete($old_file, 'simple_voting', 'voting_option', $opt->id());
+                $fileUsage->delete($old_file, 'simple_voting', 'voting_option', $opt->id());
               }
             }
           }
@@ -204,7 +237,7 @@ class VotingQuestionEditForm extends ContentEntityForm {
 
         // Handle image replacement/setting when a new file was uploaded.
         if (!empty($fid)) {
-          $file = $file_storage->load($fid);
+          $file = $fileStorage->load($fid);
           if ($file instanceof File) {
             $allowed = ['png', 'jpg', 'jpeg', 'gif'];
             $ext = strtolower(pathinfo($file->getFilename(), PATHINFO_EXTENSION));
@@ -218,12 +251,12 @@ class VotingQuestionEditForm extends ContentEntityForm {
               $file->save();
               $opt->set('image', [['target_id' => $file->id()]]);
               if (!empty($old_fid) && $old_fid != $file->id()) {
-                $old_file = $file_storage->load($old_fid);
+                $old_file = $fileStorage->load($old_fid);
                 if ($old_file) {
-                  $file_usage->delete($old_file, 'simple_voting', 'voting_option', $opt->id());
+                  $fileUsage->delete($old_file, 'simple_voting', 'voting_option', $opt->id());
                 }
               }
-              $file_usage->add($file, 'simple_voting', 'voting_option', $opt->id());
+              $fileUsage->add($file, 'simple_voting', 'voting_option', $opt->id());
             }
           }
         }
@@ -241,7 +274,7 @@ class VotingQuestionEditForm extends ContentEntityForm {
           'question_id' => $question->id(),
         ];
         if (!empty($fid)) {
-          $file = $file_storage->load($fid);
+          $file = $fileStorage->load($fid);
           if ($file instanceof File) {
             $allowed = ['png', 'jpg', 'jpeg', 'gif'];
             $ext = strtolower(pathinfo($file->getFilename(), PATHINFO_EXTENSION));
@@ -258,10 +291,10 @@ class VotingQuestionEditForm extends ContentEntityForm {
           }
         }
 
-        $new = $option_storage->create($fields);
+        $new = $optionStorage->create($fields);
         $new->save();
         if (!empty($file) && $file instanceof File) {
-          $file_usage->add($file, 'simple_voting', 'voting_option', $new->id());
+          $fileUsage->add($file, 'simple_voting', 'voting_option', $new->id());
         }
         // Save optional description for newly created option if provided.
         $desc = trim($row['description'] ?? '');
@@ -276,8 +309,7 @@ class VotingQuestionEditForm extends ContentEntityForm {
 
     // We don't maintain a mirrored 'choice' field on the question. Options
     // have been created/updated/deleted above with the proper 'question_id'.
-
-    \Drupal::messenger()->addMessage($this->t('Voting question saved with @count options.', ['@count' => count($kept)]));
+    $this->messenger()->addMessage($this->t('Voting question saved with @count options.', ['@count' => count($kept)]));
     $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $question->id()]);
   }
 

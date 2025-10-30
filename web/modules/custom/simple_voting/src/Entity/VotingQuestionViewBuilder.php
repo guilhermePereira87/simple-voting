@@ -4,13 +4,54 @@ namespace Drupal\simple_voting\Entity;
 
 use Drupal\Core\Entity\EntityViewBuilder;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Url;
 use Drupal\Component\Utility\Xss;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Custom view builder for VotingQuestion.
  */
 class VotingQuestionViewBuilder extends EntityViewBuilder {
+
+  /**
+   * The entity type manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected $entityTypeManager;
+
+  /**
+   * The form builder service.
+   *
+   * @var \Drupal\Core\Form\FormBuilderInterface
+   */
+  protected $formBuilder;
+
+  /**
+   * File URL generator.
+   *
+   * @var \Drupal\Core\File\FileUrlGeneratorInterface
+   */
+  protected $fileUrlGenerator;
+
+  /**
+   * Current user.
+   *
+   * @var \Drupal\Core\Session\AccountProxyInterface
+   */
+  protected $currentUser;
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function createInstance(ContainerInterface $container, $entity_type) {
+    $instance = parent::createInstance($container, $entity_type);
+    // Inject commonly used services to avoid Drupal:: calls inside view().
+    $instance->entityTypeManager = $container->get('entity_type.manager');
+    $instance->formBuilder = $container->get('form_builder');
+    $instance->fileUrlGenerator = $container->get('file_url_generator');
+    $instance->currentUser = $container->get('current_user');
+    return $instance;
+  }
 
   /**
    * {@inheritdoc}
@@ -23,98 +64,99 @@ class VotingQuestionViewBuilder extends EntityViewBuilder {
       return $build;
     }
 
-    /* @var \Drupal\simple_voting\Entity\VotingQuestion $entity */
+    /** @var \Drupal\simple_voting\Entity\VotingQuestion $entity */
     // Prepare options render array.
-    $options_items = [];
+    $optionsItems = [];
     // Load voting_option entities that reference this question.
-    $option_entities = [];
-    $option_storage = \Drupal::entityTypeManager()->getStorage('voting_option');
-    $ids = $option_storage->getQuery()
+    $optionEntities = [];
+    $optionStorage = $this->entityTypeManager->getStorage('voting_option');
+    $ids = $optionStorage->getQuery()
       ->condition('question_id', $entity->id())
       ->accessCheck(FALSE)
       ->sort('id', 'ASC')
       ->execute();
     if (!empty($ids)) {
-      $option_entities = $option_storage->loadMultiple($ids);
+      $optionEntities = $optionStorage->loadMultiple($ids);
     }
 
     // Determine whether the current user has voted on this question.
-    $current_user = \Drupal::currentUser();
-    $has_voted = FALSE;
-    if ($current_user->isAuthenticated()) {
-      $records = \Drupal::entityTypeManager()->getStorage('voting_record')->loadByProperties([
+    $currentUser = $this->currentUser;
+    $hasVoted = FALSE;
+    if ($currentUser->isAuthenticated()) {
+      $recordStorage = $this->entityTypeManager->getStorage('voting_record');
+      $records = $recordStorage->loadByProperties([
         'question_id' => $entity->id(),
-        'uid' => $current_user->id(),
+        'uid' => $currentUser->id(),
       ]);
-      $has_voted = !empty($records);
+      $hasVoted = !empty($records);
     }
 
     // If the user hasn't voted, render the voting form (so they can vote).
-    if (!$has_voted) {
-      $build['vote_form'] = \Drupal::formBuilder()->getForm('Drupal\simple_voting\Form\VoteRecordForm', $entity);
+    if (!$hasVoted) {
+      $build['vote_form'] = $this->formBuilder->getForm('Drupal\simple_voting\Form\VoteRecordForm', $entity);
       return $build;
     }
 
     // Determine whether to show results: only when the question setting is on.
-    $show_results = ($entity->hasField('show_results') && $entity->get('show_results')->value);
+    $showResults = ($entity->hasField('show_results') && $entity->get('show_results')->value);
 
     // If showing results, compute counts grouped by option_id.
     $counts = [];
-    if ($show_results) {
+    if ($showResults) {
       // Load voting_record entities for this question and group counts by
       // option_id. We use entity storage here to avoid DB driver-specific
       // chaining issues and keep the code robust.
-      $record_storage = \Drupal::entityTypeManager()->getStorage('voting_record');
-      $records = $record_storage->loadByProperties(['question_id' => $entity->id()]);
+      $recordStorage = $this->entityTypeManager->getStorage('voting_record');
+      $records = $recordStorage->loadByProperties(['question_id' => $entity->id()]);
       foreach ($records as $rec) {
         // `option_id` is an entity reference base field; get its target id.
-        $opt_ref = $rec->get('option_id');
-        $opt_id = is_object($opt_ref) && isset($opt_ref->target_id) ? $opt_ref->target_id : $opt_ref->value ?? NULL;
-        if ($opt_id !== NULL) {
-          $counts[$opt_id] = ($counts[$opt_id] ?? 0) + 1;
+        $optRef = $rec->get('option_id');
+        $optId = is_object($optRef) && isset($optRef->target_id) ? $optRef->target_id : $optRef->value ?? NULL;
+        if ($optId !== NULL) {
+          $counts[$optId] = ($counts[$optId] ?? 0) + 1;
         }
       }
     }
 
-    foreach ($option_entities as $opt) {
-      $title = $opt->label();
+    foreach ($optionEntities as $optEntity) {
+      $title = $optEntity->label();
 
       // Image markup if present.
-      $image_markup = '';
-      if ($opt->hasField('image') && !$opt->get('image')->isEmpty()) {
-        $fid = $opt->get('image')->target_id;
-        $file = \Drupal::entityTypeManager()->getStorage('file')->load($fid);
+      $imageMarkup = '';
+      if ($optEntity->hasField('image') && !$optEntity->get('image')->isEmpty()) {
+        $fid = $optEntity->get('image')->target_id;
+        $file = $this->entityTypeManager->getStorage('file')->load($fid);
         if ($file) {
           $uri = $file->getFileUri();
-          $url = \Drupal::service('file_url_generator')->generateAbsoluteString($uri);
-          $image_markup = '<img src="' . $url . '" alt="' . Xss::filterAdmin($title) . '" class="voting-option-image" />';
+          $url = $this->fileUrlGenerator->generateAbsoluteString($uri);
+          $imageMarkup = '<img src="' . $url . '" alt="' . Xss::filterAdmin($title) . '" class="voting-option-image" />';
         }
       }
 
       // Option description if present.
-      $description_markup = '';
-      if ($opt->hasField('text') && !$opt->get('text')->isEmpty()) {
-        $desc = $opt->get('text')->value;
+      $descriptionMarkup = '';
+      if ($optEntity->hasField('text') && !$optEntity->get('text')->isEmpty()) {
+        $desc = $optEntity->get('text')->value;
         if (trim($desc) !== '') {
-          $description_markup = '<div class="voting-option-description">' . Xss::filterAdmin($desc) . '</div>';
+          $descriptionMarkup = '<div class="voting-option-description">' . Xss::filterAdmin($desc) . '</div>';
         }
       }
 
-      $count_markup = '';
-      if ($show_results) {
-        $count = $counts[$opt->id()] ?? 0;
-        $count_markup = '<span class="voting-option-count">' . $this->t('@count votes', ['@count' => $count]) . '</span>';
+      $countMarkup = '';
+      if ($showResults) {
+        $count = $counts[$optEntity->id()] ?? 0;
+        $countMarkup = '<span class="voting-option-count">' . $this->t('@count votes', ['@count' => $count]) . '</span>';
       }
 
-      $options_items[] = [
-        '#markup' => '<div class="voting-option">' . $image_markup . '<div class="voting-option-title">' . Xss::filterAdmin($title) . '</div>' . $description_markup . $count_markup . '</div>',
+      $optionsItems[] = [
+        '#markup' => '<div class="voting-option">' . $imageMarkup . '<div class="voting-option-title">' . Xss::filterAdmin($title) . '</div>' . $descriptionMarkup . $countMarkup . '</div>',
       ];
     }
 
-    if (!empty($options_items)) {
+    if (!empty($optionsItems)) {
       $build['options'] = [
         '#theme' => 'item_list',
-        '#items' => $options_items,
+        '#items' => $optionsItems,
         '#attributes' => ['class' => ['voting-question-options']],
         '#weight' => 10,
       ];
