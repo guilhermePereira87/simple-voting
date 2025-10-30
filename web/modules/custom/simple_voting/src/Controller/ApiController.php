@@ -138,11 +138,13 @@ class ApiController extends ControllerBase {
       return new JsonResponse(['error' => 'Question not found'], 404);
     }
 
-    // Determine whether results are visible for this question.
-    $show_results = ($question->hasField('show_results') && !$question->get('show_results')->isEmpty()) ? (bool) $question->get('show_results')->value : FALSE;
-    $current_user = \Drupal::currentUser();
-    // Allow access if show_results is true or the current user has an administrative permission.
-    if (!$show_results && !$current_user->hasPermission('administer site configuration')) {
+    $show_results = FALSE;
+    if ($question->hasField('show_results') && !$question->get('show_results')->isEmpty()) {
+      $show_results = (bool) $question->get('show_results')->value;
+    }
+
+    // If results are not enabled for this question, deny access.
+    if (!$show_results) {
       return new JsonResponse(['error' => 'Results are not available for this question'], 403);
     }
 
@@ -189,58 +191,6 @@ class ApiController extends ControllerBase {
     ];
 
     return new JsonResponse(['data' => $data]);
-  }
-
-  /**
-   * Authenticate a user and start a session.
-   *
-   * Expects JSON body: { "name": "username", "pass": "password" }
-   * Returns 200 on success and sets the session cookie. Returns 401 on failure.
-   */
-  public function login(Request $request) {
-    // Accept JSON or form-encoded bodies.
-    $data = [];
-    $content = $request->getContent();
-    if (!empty($content)) {
-      $decoded = json_decode($content, TRUE);
-      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-        $data = $decoded;
-      }
-    }
-    // Fallback to request parameters if not JSON.
-    if (empty($data)) {
-      $data['name'] = $request->request->get('name');
-      $data['pass'] = $request->request->get('pass');
-    }
-
-    $name = $data['name'] ?? NULL;
-    $pass = $data['pass'] ?? NULL;
-    if (empty($name) || empty($pass)) {
-      return new JsonResponse(['error' => 'Missing credentials'], 400);
-    }
-
-    try {
-      $auth = \Drupal::service('user.auth');
-      $uid = $auth->authenticate($name, $pass);
-      if ($uid === FALSE || $uid === 0) {
-        return new JsonResponse(['error' => 'Invalid credentials'], 401);
-      }
-
-      // Load user entity and finalize login (sets session, cookies, etc.).
-      $account = \Drupal\user\Entity\User::load($uid);
-      if (!$account instanceof UserInterface) {
-        return new JsonResponse(['error' => 'Invalid user account'], 401);
-      }
-
-      // Finalize login: sets current user in session and sends cookie in response.
-      user_login_finalize($account);
-
-      return new JsonResponse(['status' => 'ok', 'uid' => $uid]);
-    }
-    catch (\Exception $e) {
-      \Drupal::logger('simple_voting')->error('Login error: @msg', ['@msg' => $e->getMessage()]);
-      return new JsonResponse(['error' => 'Internal server error'], 500);
-    }
   }
 
   /**
@@ -333,6 +283,57 @@ class ApiController extends ControllerBase {
         return new JsonResponse(['error' => 'Already voted'], 409);
       }
       \Drupal::logger('simple_voting')->error('Unexpected error in API vote: @msg', ['@msg' => $message]);
+      return new JsonResponse(['error' => 'Internal server error'], 500);
+    }
+  }
+
+  /**
+   * Authenticate a user and start a session.
+   *
+   * Expects JSON body: { "name": "username", "pass": "password" }
+   */
+  public function login(Request $request) {
+    // Accept JSON or form-encoded bodies.
+    $data = [];
+    $content = $request->getContent();
+    if (!empty($content)) {
+      $decoded = json_decode($content, TRUE);
+      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $data = $decoded;
+      }
+    }
+    // Fallback to request parameters if not JSON.
+    if (empty($data)) {
+      $data['name'] = $request->request->get('name');
+      $data['pass'] = $request->request->get('pass');
+    }
+
+    $name = $data['name'] ?? NULL;
+    $pass = $data['pass'] ?? NULL;
+    if (empty($name) || empty($pass)) {
+      return new JsonResponse(['error' => 'Missing credentials'], 400);
+    }
+
+    try {
+      $auth = \Drupal::service('user.auth');
+      $uid = $auth->authenticate($name, $pass);
+      if ($uid === FALSE || $uid === 0) {
+        return new JsonResponse(['error' => 'Invalid credentials'], 401);
+      }
+
+      // Load user entity and finalize login (sets session, cookies, etc.).
+      $account = \Drupal\user\Entity\User::load($uid);
+      if (!$account instanceof UserInterface) {
+        return new JsonResponse(['error' => 'Invalid user account'], 401);
+      }
+
+      // Finalize login: sets current user in session and sends cookie in response.
+      user_login_finalize($account);
+
+      return new JsonResponse(['status' => 'ok', 'uid' => $uid]);
+    }
+    catch (\Exception $e) {
+      \Drupal::logger('simple_voting')->error('Login error: @msg', ['@msg' => $e->getMessage()]);
       return new JsonResponse(['error' => 'Internal server error'], 500);
     }
   }
