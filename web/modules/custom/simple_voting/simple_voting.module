@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file
+ * Simple Voting module procedural hooks.
+ */
 
 /**
  * Implements hook_install().

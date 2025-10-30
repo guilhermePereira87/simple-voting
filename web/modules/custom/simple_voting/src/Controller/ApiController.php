@@ -11,7 +11,6 @@ use Drupal\user\UserInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Session\AccountProxyInterface;
-use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\user\UserAuthInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 
@@ -42,9 +41,9 @@ class ApiController extends ControllerBase {
   protected $currentUser;
 
   /**
-   * Entity query factory.
+   * Placeholder for entity query service when available.
    *
-   * @var \Drupal\Core\Entity\Query\QueryFactory
+   * @var mixed|null
    */
   protected $entityQuery;
 
@@ -65,11 +64,11 @@ class ApiController extends ControllerBase {
   /**
    * ApiController constructor.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, FileUrlGeneratorInterface $file_url_generator, AccountProxyInterface $current_user, QueryFactory $entity_query, UserAuthInterface $user_auth, LoggerChannelFactoryInterface $logger_factory) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, FileUrlGeneratorInterface $file_url_generator, AccountProxyInterface $current_user, UserAuthInterface $user_auth, LoggerChannelFactoryInterface $logger_factory) {
     $this->entityTypeManager = $entity_type_manager;
     $this->fileUrlGenerator = $file_url_generator;
     $this->currentUser = $current_user;
-    $this->entityQuery = $entity_query;
+    $this->entityQuery = NULL;
     $this->userAuth = $user_auth;
     $this->logger = $logger_factory->get('simple_voting');
   }
@@ -82,7 +81,6 @@ class ApiController extends ControllerBase {
       $container->get('entity_type.manager'),
       $container->get('file_url_generator'),
       $container->get('current_user'),
-      $container->get('entity.query'),
       $container->get('user.auth'),
       $container->get('logger.factory')
     );
@@ -247,9 +245,9 @@ class ApiController extends ControllerBase {
     $totalVotes = 0;
     $counts = [];
     if (!empty($optIds)) {
-      // Use entityQuery to count voting_record per option.
+      $recordStorage = $this->entityTypeManager->getStorage('voting_record');
       foreach ($optIds as $optId) {
-        $query = $this->entityQuery->get('voting_record')
+        $query = $recordStorage->getQuery()
           ->accessCheck(FALSE)
           ->condition('question_id', $question->id())
           ->condition('option_id', $optId)
@@ -296,8 +294,7 @@ class ApiController extends ControllerBase {
   public function vote($questionId, $optionId) {
     try {
       $currentUser = $this->currentUser;
-      // Require authenticated user for API voting. Anonymous votes are not allowed
-      // via the API to ensure each vote is attributable to a user.
+      // Require authenticated user for API voting.
       if (!$currentUser->isAuthenticated()) {
         return new JsonResponse(['error' => 'Authentication required'], 401);
       }
@@ -434,7 +431,7 @@ class ApiController extends ControllerBase {
       }
 
       // Finalize login: sets current user in session and sends cookie in response.
-      user_login_finalize($account);
+  \user_login_finalize($account);
 
       return new JsonResponse(['status' => 'ok', 'uid' => $uid]);
     }
