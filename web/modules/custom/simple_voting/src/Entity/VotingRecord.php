@@ -82,6 +82,9 @@ final class VotingRecord extends ContentEntityBase implements UserEntityOwnerInt
 
   /**
    * Callback for current user.
+   *
+   * @return array
+   *   An array with the current user ID.
    */
   public static function defaultUserId(): array {
     $currentUser = \Drupal::currentUser();

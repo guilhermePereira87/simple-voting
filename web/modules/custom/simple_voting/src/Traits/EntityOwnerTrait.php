@@ -37,6 +37,7 @@ trait EntityOwnerTrait {
    * Gets the owner ID.
    *
    * @return int|null
+   *   The user ID of the owner, or NULL when not set.
    */
   public function getOwnerId() {
     return $this->get('uid')->target_id;

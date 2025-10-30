@@ -104,12 +104,10 @@ class VotingQuestionViewBuilder extends EntityViewBuilder {
     $counts = [];
     if ($showResults) {
       // Load voting_record entities for this question and group counts by
-      // option_id. We use entity storage here to avoid DB driver-specific
-      // chaining issues and keep the code robust.
+      // option_id.
       $recordStorage = $this->entityTypeManager->getStorage('voting_record');
       $records = $recordStorage->loadByProperties(['question_id' => $entity->id()]);
       foreach ($records as $rec) {
-        // `option_id` is an entity reference base field; get its target id.
         $optRef = $rec->get('option_id');
         $optId = is_object($optRef) && isset($optRef->target_id) ? $optRef->target_id : $optRef->value ?? NULL;
         if ($optId !== NULL) {

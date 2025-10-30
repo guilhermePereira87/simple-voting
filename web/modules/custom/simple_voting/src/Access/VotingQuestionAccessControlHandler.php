@@ -8,7 +8,7 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Access\AccessResult;
 
 /**
- *
+ * Access control handler for VotingQuestion entities.
  */
 class VotingQuestionAccessControlHandler extends EntityAccessControlHandler {
 

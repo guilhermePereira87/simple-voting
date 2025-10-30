@@ -8,7 +8,9 @@ use Drupal\file\Entity\File;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * Add-only form for VotingQuestion with add-more option rows (title + optional image).
+ * Add-only form for VotingQuestion with add-more option rows.
+ *
+ * Supports title and optional image per option.
  */
 class VotingQuestionAddForm extends ContentEntityForm {
 
@@ -113,7 +115,6 @@ class VotingQuestionAddForm extends ContentEntityForm {
       '#type' => 'submit',
       '#value' => $this->t('Add another option'),
       '#submit' => ['::addOne'],
-      // Prevent full form validation when adding more rows.
       '#limit_validation_errors' => [],
       '#ajax' => [
         'callback' => '::ajaxCallback',
@@ -126,6 +127,13 @@ class VotingQuestionAddForm extends ContentEntityForm {
 
   /**
    * Submit handler to add one more option row and rebuild the form.
+   *
+   * @param array $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return void
    */
   public function addOne(array &$form, FormStateInterface $form_state) {
     $num = $form_state->get('num_options') ?: 0;
@@ -135,6 +143,14 @@ class VotingQuestionAddForm extends ContentEntityForm {
 
   /**
    * Ajax callback for add-more.
+   *
+   * @param array $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return array
+   *   The part of the form to be replaced.
    */
   public function ajaxCallback(array &$form, FormStateInterface $form_state) {
     return $form['options'];
@@ -145,10 +161,8 @@ class VotingQuestionAddForm extends ContentEntityForm {
    */
   public function save(array $form, FormStateInterface $form_state) {
     // Ensure the published state from the form is applied before the entity
-    // is saved so the initial save includes the desired status.
+    // is saved so the initial save includes the selected status.
     $status = $form_state->getValue('status');
-    // Set the status field value directly. VotingQuestion implements the
-    // published convention, so writing the 'status' base field is sufficient.
     $this->entity->set('status', (bool) $status);
 
     // Save the question first to ensure it has an ID for option references.
@@ -157,7 +171,6 @@ class VotingQuestionAddForm extends ContentEntityForm {
 
     $options = $form_state->getValue('options') ?? [];
     if (empty($options) || !is_array($options)) {
-      // Nothing to do.
       $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $question->id()]);
       return;
     }
@@ -193,7 +206,6 @@ class VotingQuestionAddForm extends ContentEntityForm {
       if ($fid) {
         $file = $fileStorage->load($fid);
         if ($file instanceof File) {
-          // Validate extension manually to avoid relying on upload validator plugin.
           $allowed = ['png', 'jpg', 'jpeg', 'gif'];
           $ext = strtolower(pathinfo($file->getFilename(), PATHINFO_EXTENSION));
           if (in_array($ext, $allowed, TRUE)) {
@@ -218,10 +230,9 @@ class VotingQuestionAddForm extends ContentEntityForm {
       $createdIds[] = $option->id();
     }
 
-    // Options are already created with 'question_id' set; no mirrored
-    // references are maintained on the question entity.
+    // Options are already created with 'question_id' set.
     $this->messenger()->addMessage($this->t('Voting question created with @count options.', ['@count' => count($createdIds)]));
-
+    // Redirect to the newly created question view page.
     $form_state->setRedirect('entity.voting_question.canonical', ['voting_question' => $question->id()]);
   }
 
